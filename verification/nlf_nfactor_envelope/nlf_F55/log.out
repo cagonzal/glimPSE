@@ -1,0 +1,786 @@
+
+          ___           ____  _____ ______
+   ____ _/ (_)___ ___  / __ \/ ___// ____/
+  / __ `/ / / __ `__ \/ /_/ /\__ \/ __/   
+ / /_/ / / / / / / / / ____/___/ / /___   
+ \__, /_/_/_/ /_/ /_/_/    /____/_____/   
+/____/
+             
+
+
+Running with 2 ranks
+Reading parameters from pse_config.yaml
+Running with pressure gradient turned on
+U Cartesian Shape: (290, 60)
+U Curvilinear Shape: (290, 60)
+Nondimensionalizing the flow field...
+l0 = 0.00017046427985837386
+U_inf = 20.494257167690883
+X0 = 0.1588062863677858
+Re = 931.6103438193982
+nu nondim = 0.0010734101511799656
+omega nondim = 0.09720621190145416
+F = 104.34213461277169
+GCL condition is NOT satisfied!
+Max GCL error = 0.0018022240051937576
+Mean GCL error = 0.00010700657632462615
+Curved surface baseflow initialized
+
+delta99 = 4.752647213185409
+Initializing the NLPSE calculation with Linear solve
+
+Rank 1 handling modes 1 to 1
+omega = 0.051208800500000005
+beta = 0.0
+Initializing mode (1, 0) with LST
+Rank 0 handling modes 0 to 0
+2 modes in this calculation:
+
+Mode [0 0]: alpha = 0j
+Mode [1 0]: alpha = (0.15568623055777123-0.000995301184687353j)
+All ranks have finished initializing the NLPSE calculation
+
+Solved station 0
+Starting station 1
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 7.4472315311431885
+Starting station 2
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 7.952986478805542
+Starting station 3
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 8.899908065795898
+Starting station 4
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 9.692318439483643
+Starting station 5
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 10.578362226486206
+Starting station 6
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 11.441750764846802
+Starting station 7
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 12.223376512527466
+Starting station 8
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 12.778180837631226
+Starting station 9
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 13.535076379776001
+Starting station 10
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 14.278854131698608
+Starting station 11
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 15.033855676651001
+Starting station 12
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 15.599945783615112
+Starting station 13
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 16.653226852416992
+Starting station 14
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 17.302419185638428
+Starting station 15
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 18.02887201309204
+Starting station 16
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 18.818352222442627
+Starting station 17
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 19.688687801361084
+Starting station 18
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 20.4243483543396
+Starting station 19
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 21.34431028366089
+Starting station 20
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 22.16727638244629
+Starting station 21
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 22.910959482192993
+Starting station 22
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 23.683836221694946
+Starting station 23
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 24.30758309364319
+Starting station 24
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 25.203078985214233
+Starting station 25
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 25.897505283355713
+Starting station 26
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 26.647750854492188
+Starting station 27
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 27.408243417739868
+Starting station 28
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 28.15927219390869
+Starting station 29
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 28.86191964149475
+Starting station 30
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 29.599751710891724
+Starting station 31
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 30.538876056671143
+Starting station 32
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 31.340818166732788
+Starting station 33
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 32.278945446014404
+Starting station 34
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 33.25860619544983
+Starting station 35
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 34.27197861671448
+Starting station 36
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 35.26029706001282
+Starting station 37
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 36.31445074081421
+Starting station 38
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 37.453145027160645
+Starting station 39
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 38.24370336532593
+Starting station 40
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 39.260318756103516
+Starting station 41
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 40.072524309158325
+Starting station 42
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 40.9528021812439
+Starting station 43
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 41.67504262924194
+Starting station 44
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 42.27069020271301
+Starting station 45
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 42.93886208534241
+Starting station 46
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 43.719265937805176
+Starting station 47
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 44.55788469314575
+Starting station 48
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 45.40449404716492
+Starting station 49
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 46.08829617500305
+Starting station 50
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 46.73504137992859
+Starting station 51
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 47.619768142700195
+Starting station 52
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 48.59988594055176
+Starting station 53
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 49.47605609893799
+Starting station 54
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 50.156574726104736
+Starting station 55
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 50.476115703582764
+Starting station 56
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 51.589661598205566
+Starting station 57
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 52.6590461730957
+Starting station 58
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 53.79437732696533
+Starting station 59
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 54.920674562454224
+Starting station 60
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 55.92201328277588
+Starting station 61
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 56.82702875137329
+Starting station 62
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 57.40776467323303
+Starting station 63
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 58.30414128303528
+Starting station 64
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 59.347832679748535
+Starting station 65
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 60.17462182044983
+Starting station 66
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 61.39474439620972
+Starting station 67
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 62.42067575454712
+Starting station 68
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 63.52490520477295
+Starting station 69
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 64.6520836353302
+Starting station 70
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 65.86309361457825
+Starting station 71
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 66.98931980133057
+Starting station 72
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 68.0020318031311
+Starting station 73
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 69.02096128463745
+Starting station 74
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 69.90708327293396
+Starting station 75
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 71.37499785423279
+Starting station 76
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 72.4762225151062
+Starting station 77
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 73.99987006187439
+Starting station 78
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 75.63928842544556
+Starting station 79
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 77.17677974700928
+Starting station 80
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 78.62573194503784
+Starting station 81
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 80.05041456222534
+Starting station 82
+Rank 0 handling modes [0]
+Finished computing mean flow
+=============
+Saving data...
+=============
+Data saved to nlpse_data/nlpse_data.h5
+Keys in the saved file: ['R', 'U', 'Uy', 'V', 'alpha', 'eigs', 'p', 'u', 'v', 'w', 'x', 'x_alpha', 'xi', 'xx', 'y', 'yy']
+Elapsed time so far = 81.6581859588623
+
+Final xi location reached. Shutting down the simulation now...
+Total elapsed time = 81.6584804058075
+Finished glimPSE run
+Wed Nov 13 16:57:18 PST 2024

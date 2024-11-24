@@ -1,0 +1,55 @@
+# PSE Solver Configuration
+
+simulation:
+  type: NLPSE  # Options: NLPSE, LPSE, LST, GORTLER
+  linear: false
+  restart: false
+  equations: NLPSE
+
+flow:
+  Re: 181.6590
+  Uinf: 1.0
+  x0: 181.6590
+  nu: 0.005504819
+
+disturbance:
+  # F: 89.0
+  F: 0.000001
+  b: 2.11555
+  init_modes:
+    - [0, 1]
+    - [0, 1]
+  amplitudes:
+    A0: 0.0160
+    A1: 0.0160
+
+geometry:
+  type: gortler
+  # type: flat_plate
+  curvature:
+    kappa: -0.00017202558830099385
+  ymax: 150.0
+
+grid:
+  method: cheby
+  Ny: 80
+  Nx: 440
+  hx: 5.0
+  # hx_factor: 1.0
+
+modes:
+  temporal: 0
+  spanwise: 8
+
+output:
+  sync_frequency: 5
+  log_interval: 1
+
+numerical:
+  stabilizer: True
+  dpdx_stabilizer: True
+  adaptive: False
+  alpha_max_iteration: 15
+  alpha_tol: 1.0e-8
+  NL_max_iteration: 20
+  NL_tol: 1.e-3

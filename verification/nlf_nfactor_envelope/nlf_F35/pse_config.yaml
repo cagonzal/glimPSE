@@ -1,0 +1,64 @@
+# PSE Solver Configuration
+
+simulation:
+  type: NLPSE # Options: NLPSE, LST, GORTLER
+  linear: true
+  restart: false
+
+flow:
+  # chord Re
+  # Re: 4.0e+6
+  # based on Re_delta at leading edge
+  Re: 931.0691
+  # Re: 797.0101
+  Uinf: 1.0
+  x0: 0.1
+  nu: 0.00107403
+  # nu: 0.00125468
+  velocity_file: nlf_contravariant_velocity_data.h5
+  baseflow: "external"
+
+disturbance:
+  # F: 194 # for Uinf=15 i.e. global value
+  # F: 104.585 # for local Uinf
+  F: 35.0
+  b: 0.0
+  init_modes:
+    - [1, 0]
+    - [1, 0]
+  amplitudes:
+    A0: 0.00075
+    A1: 0.00075
+
+geometry:
+  type: import_geom
+  curvature:
+    kappa: 0.
+  ymax: 0.025
+  # ymax: 0.08
+  # ymax: 0.25
+  surface_file: nlf_upper_surface.h5
+
+grid:
+  method: geometric
+  Ny: 60
+  Nx: 290
+  hx: 1.0
+  xi_max: 1400
+
+modes:
+  temporal: 1
+  spanwise: 0
+
+output:
+  sync_frequency: 1
+  log_interval: 1
+
+numerical:
+  stabilizer: false
+  dpdx_stabilizer: false
+  adaptive: False
+  alpha_max_iteration: 40
+  alpha_tol: 1.0e-12
+  NL_max_iteration: 50
+  NL_tol: 1.e-4

@@ -1,0 +1,5 @@
+rm log.*
+rm nlpse_data/*
+rm *.png
+rm *.npy
+rm *.gif

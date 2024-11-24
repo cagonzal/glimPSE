@@ -1,0 +1,52 @@
+# PSE Solver Configuration
+
+simulation:
+  type: NLPSE  # Options: NLPSE, LPSE, LST, GORTLER
+  linear: false
+  restart: false
+  equations: NLPSE
+
+flow:
+  Re: 523.
+  Uinf: 1.0
+  x0: 523.
+  nu: 0.00191204588910  # Kinematic viscosity = 1/Re
+
+disturbance:
+  F: 86.
+  b: 0.2222222222222222
+  init_modes:
+    - [1, 1]
+    - [1, -1]
+  amplitudes:
+    A0: 0.007071067812
+    A1: 0.007071067812
+
+geometry:
+  type: flat_plate
+  curvature:
+    kappa: 0.
+  ymax: 75.
+
+grid:
+  method: cheby
+  Ny: 100
+  Nx: 3000
+  hx_factor: 0.2
+
+modes:
+  temporal: 6
+  spanwise: 6
+
+output:
+  sync_frequency: 1
+  log_interval: 1
+
+numerical:
+  stabilizer: True
+  dpdx_stabilizer: True
+  adaptive: False
+  alpha_max_iteration: 15
+  alpha_tol: 1.0e-12
+  NL_max_iteration: 10
+  NL_tol: 1.e-3

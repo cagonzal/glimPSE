@@ -1897,22 +1897,6 @@ class LST():
         else:
             print("No suitable TS mode found")
 
-        # if station == 0:
-            # Create the directory if it doesn't exist
-            # omega = self.config['disturbance']['omega']
-            # beta = self.config['disturbance']['beta']
-            # os.makedirs(f'lst_data_omega_{omega}_beta_{beta}', exist_ok=True)
-
-            # np.save(f'lst_data_omega_{omega}_beta_{beta}/alphas.npy', alphas)
-            # np.save(f'lst_data_omega_{omega}_beta_{beta}/modes.npy', self.helper_mats['u_from_SPE'] @ self.helper_mats['uvwP_from_LST'] @ modes)
-
-            # np.save('lst_data/u.npy', self.Baseflow.U[0, :])
-            # np.save('lst_data/uy.npy', self.Baseflow.Uy[0, :])
-            # np.save('lst_data/ux.npy', self.Baseflow.Ux[0, :])
-            # np.save('lst_data/v.npy', self.Baseflow.V[0, :])
-            # np.save('lst_data/vx.npy', self.Baseflow.Vx[0, :])
-            # np.save('lst_data/y.npy', self.ygrid)
-
         self.alpha[station] = TS_mode_frequency
         self.q[:,station]    = helper_mats['uvwP_from_LST'] @ TS_mode
 
@@ -2067,38 +2051,6 @@ class Gortler():
 
         self.alpha[station] = TS_mode_frequency
         self.q[:,station]   = TS_mode[:,0]
-    
-        #HACK:
-        # TS_idx = np.asarray(215)
-        # TS_idx = np.asarray(146)
-        # self.q[:,station]   = TS_mode
-
-        # plt.figure(figsize=(6,3),dpi=200)
-        # plt.plot(np.real(alphas), np.imag(alphas), 'o', markeredgecolor='k')
-        # plt.plot(np.real(TS_mode_frequency), np.imag(TS_mode_frequency), 'ro')
-        # # xlim near ts mode frequency 
-        # plt.xlim([-0.005, 0.005])
-        # plt.ylim([-0.005, 0.005])
-        #
-        # plt.xlabel(r'$\alpha_r$')
-        # plt.ylabel(r'$\alpha_i$')
-        # plt.title(r"$\kappa = $"  + f"{self.kappa}")
-        # plt.tight_layout()
-        # plt.savefig('./spectrum.png')
-
-
-        # plt.figure(figsize=(6,3),dpi=200)
-        # plt.plot(np.abs(self.helper_mats['u_from_SPE'] @ TS_mode[:,0]), self.ygrid, label='abs')
-        # plt.plot(np.real(self.helper_mats['u_from_SPE'] @ TS_mode[:,0]), self.ygrid, label='real')
-        # plt.plot(np.imag(self.helper_mats['u_from_SPE'] @ TS_mode[:,0]), self.ygrid, label='imag')
-        # plt.legend()
-        # plt.xlabel(r'$|\hat{u}|$')
-        # plt.ylabel(r'$y$')
-        # plt.title(r"$\kappa = $"  + f"{self.kappa}")
-        # plt.tight_layout()
-        # plt.savefig('./gortler.png')
-
-        # sys.exit()
 
         return
 

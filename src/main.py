@@ -25,7 +25,9 @@ def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    print_rz(f"Running with {size} ranks")
+
+    # print splash art 
+    io.start_run_message()
 
     start = time.time()
 

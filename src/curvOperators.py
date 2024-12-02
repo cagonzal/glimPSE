@@ -1543,7 +1543,6 @@ class NLPSE():
             alpha_global = np.asarray(self.comm.allgather(alpha_local))
             q_global = np.asarray(self.comm.allgather(q_local))
 
-            print_rz(f"{numModes} modes in this calculation:\n")
             if self.rank == 0:
                 for idx, mode in enumerate(self.harmonics):
                     print(f"Mode {mode}: alpha = {alpha_global[idx]}")

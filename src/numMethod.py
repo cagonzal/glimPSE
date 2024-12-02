@@ -1043,7 +1043,6 @@ class gortlerGrid:
         # dtheta_dxi = np.ones((self.Nx,1)) * self.kappa_temp * -1.0
         # dtheta_dxi = np.squeeze(dtheta_dxi,1)
         K1 = -1.0 * dtheta_dxi
-        print_rz(f"Grid Generation. Kappa = {K1}")
         if self.rank == 0:
             np.save("kappa.npy",K1)
 

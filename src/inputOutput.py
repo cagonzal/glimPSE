@@ -239,3 +239,14 @@ def read_velocity_field(filename):
     except KeyError as e:
         print(f"Error: {e}")
         raise
+
+def start_run_message():
+    print_rz("""
+          ___           ____  _____ ______
+   ____ _/ (_)___ ___  / __ \/ ___// ____/
+  / __ `/ / / __ `__ \/ /_/ /\__ \/ __/   
+ / /_/ / / / / / / / / ____/___/ / /___   
+ \__, /_/_/_/ /_/ /_/_/    /____/_____/   
+/____/
+             """)
+    print_rz("\n")

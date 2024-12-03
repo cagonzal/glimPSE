@@ -1134,191 +1134,259 @@ class NLPSE():
             alpha_new = alpha - relaxation * 1.j / hx * (inner_product(q_new - q_old, q_new) / inner_product(q_new, q_new))
 
         return alpha_new
-    
-    def NL_iteration(self, converged, station):
+
+    def _initialize_iteration_arrays(self, numModes, numEigs):
+        """Initialize arrays needed for non-linear iteration.
+        
+        Args:
+            numModes (int): Number of modes to process
+            numEigs (int): Number of eigenvalues to compute
+            
+        Returns:
+            tuple: Initialized arrays for Fr, eigs, alpha, delta_alpha, and q (both local and global)
         """
-        Performs a non-linear iteration.
-
-        Parameters:
-            converged (bool): Convergence flag.
-            station (int): Station index.
-        """
-        NL_max_iteration = self.config['numerical']['NL_max_iteration']
-        NL_tol = self.config['numerical']['NL_tol']
-        iteration = 0 
-
-        numModes = self.harmonics.shape[0]
-        # numEigs = self.config['numerical']['numEigs']
-        numEigs = 4*self.Ny
-
         modes_per_rank = numModes // self.size
         Fr_local = np.zeros((4*self.Ny), dtype=complex)
         Fr_global = np.zeros((numModes, 4*self.Ny), dtype=complex)
-
+        
         eigs_local = np.zeros((numEigs), dtype=complex)
         eigs_global = np.zeros((numModes, numEigs), dtype=complex)
-
+        
         alpha_local = 0.0j
         alpha_global = np.zeros((numModes), dtype=complex)
         delta_alpha_mn = np.zeros((numModes), dtype=float)
         q_local = np.zeros((4*self.Ny), dtype=complex)
         q_global = np.zeros((numModes, 4*self.Ny), dtype=complex)
+        
+        return (modes_per_rank, Fr_local, Fr_global, eigs_local, eigs_global, 
+                alpha_local, alpha_global, delta_alpha_mn, q_local, q_global)
 
+    def _process_first_iteration(self, station, mode, Fr_local, Fr_global, numModes):
+        """Process the first iteration for a given mode.
+        
+        Args:
+            station (int): Current station index
+            mode (tuple): Current mode being processed
+            Fr_local (np.ndarray): Local forcing term
+            Fr_global (np.ndarray): Global forcing term
+            numModes (int): Total number of modes
+        """
+        Fr_local = self.computeNLT(self.helper_mats, station, mode[0], mode[1]) 
+        Fr_global = np.asarray(self.comm.allgather(Fr_local))
+        
+        # need to move Fr into Fmn 
+        if self.rank == 0:
+            for jj in range(numModes):
+                self.Fmn[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(Fr_global[jj, :])
+        
+        # broadcast the forcing to all ranks
+        self.Fmn[station, :, :, :] = self.comm.bcast(self.Fmn[station, :, :, :], root=0)
+
+    def _handle_mean_flow_distortion(self, station):
+        """Handle the mean flow distortion (MFD) calculation.
+        
+        Args:
+            station (int): Current station index
+            
+        Returns:
+            np.ndarray: Updated q_local array
+        """
+        if "baseflow" in self.config["flow"].keys():
+            if self.config["flow"]["baseflow"] == "external":
+                self.useExternalMeanFlow(station)
+            else:
+                print_rz("Invalid option for baseflow in input file!")
+        else:
+            self.updateMeanFlow(self.helper_mats, station)
+        
+        q_local = np.copy(self.q[station, 0, 0, :]) 
+        
+        if self.config['simulation']['linear']:
+            print_rz("Finished computing mean flow")
+        else:
+            print_rz("Finished computing the mean flow distortion")
+            
+        return q_local
+
+    def _broadcast_flow_variables(self, station):
+        """Broadcast flow variables to all ranks.
+        
+        Args:
+            station (int): Current station index
+        """
+        self.U  = self.comm.bcast(self.U,  root=0)
+        self.V  = self.comm.bcast(self.V,  root=0)
+        self.P  = self.comm.bcast(self.P,  root=0)
+        self.Ux = self.comm.bcast(self.Ux, root=0)
+        self.Vx = self.comm.bcast(self.Vx, root=0)
+        self.Uy = self.comm.bcast(self.Uy, root=0)
+        self.Vy = self.comm.bcast(self.Vy, root=0)
+        self.U_nlt0  = self.comm.bcast(self.U_nlt0,  root=0)
+        self.V_nlt0  = self.comm.bcast(self.V_nlt0,  root=0)
+        self.P_nlt0  = self.comm.bcast(self.P_nlt0,  root=0)
+        self.q[station, 0, 0, 0:self.Ny]    = self.comm.bcast(self.q[station, 0, 0, 0:self.Ny], root=0)
+        self.q[station, 0, 0, self.Ny:2*self.Ny] = self.comm.bcast(self.q[station, 0, 0, self.Ny:2*self.Ny], root=0)
+
+    def _check_nlt_convergence(self, station, mode, Fr_local, numModes, modes_per_rank, iteration):
+        """Check convergence of non-linear terms.
+        
+        Args:
+            station (int): Current station index
+            mode (tuple): Current mode being processed
+            Fr_local (np.ndarray): Local forcing term
+            numModes (int): Total number of modes
+            modes_per_rank (int): Number of modes per rank
+            iteration (int): Current iteration count
+            
+        Returns:
+            tuple: Boolean indicating convergence and updated Fr_global array
+        """
+        delta_Fmn = np.zeros((self.harmonics.shape[0]))
+        Fr_local = self.computeNLT(self.helper_mats, station, mode[0], mode[1])
+        
+        if np.linalg.norm(Fr_local) == 0.0:
+            delta_Fmn_local = 0.0
+        else:
+            delta_Fmn_local = np.linalg.norm(Fr_local - self.Fmn[station, mode[0], mode[1], :]) / np.linalg.norm(self.Fmn[station, mode[0], mode[1], :])
+        
+        self.comm.Barrier()
+        delta_Fmn = np.asarray(self.comm.allgather(delta_Fmn_local))
+        
+        if any(value > 1e3 for value in delta_Fmn) and iteration > 5:
+            print_rz("PSE is unstable. Killing job.\n")
+            sys.exit()
+        
+        print_rz("ΔFmn = \n")
+        print_rz(delta_Fmn)
+        print_rz("\n")
+        
+        converged = np.max(delta_Fmn) < self.config['numerical']['NL_tol']
+        
+        if converged:
+            print_rz("NLTs converged to tolerance")
+            print_rz(f"NLTs converged in {iteration} iterations")
+        
+        return converged, Fr_local
+
+    def _compute_eigenvalues(self, station, mode, numModes, modes_per_rank):
+        """Compute eigenvalues if configured.
+        
+        Args:
+            station (int): Current station index
+            mode (tuple): Current mode being processed
+            numModes (int): Total number of modes
+            modes_per_rank (int): Number of modes per rank
+            
+        Returns:
+            np.ndarray: Computed eigenvalues
+        """
+        eigs_local = np.zeros((4*self.Ny), dtype=complex)
+        if not (mode[0] == 0 and mode[1] == 0):
+            self.formOperators(self.helper_mats, station, mode[0], mode[1], 
+                            self.stabilizer, setup_eigs=self.config['numerical']['compute_eigs'])
+            self.setBCs(mode[0], mode[1], setup_eigs=self.config['numerical']['compute_eigs'])
+            if self.config['numerical']['compute_eigs']:
+                eigs_local = np.linalg.eigvals(self.L)
+        return eigs_local
+
+    def NL_iteration(self, converged, station):
+        """Performs a non-linear iteration.
+        
+        Parameters:
+            converged (bool): Convergence flag.
+            station (int): Station index.
+        """
+        NL_max_iteration = self.config['numerical']['NL_max_iteration']
+        iteration = 0 
+        
+        numModes = self.harmonics.shape[0]
+        numEigs = 4*self.Ny
+        
+        # Initialize arrays
+        (modes_per_rank, Fr_local, Fr_global, eigs_local, eigs_global, 
+        alpha_local, alpha_global, delta_alpha_mn, q_local, q_global) = self._initialize_iteration_arrays(numModes, numEigs)
+        
         print_rz(f"modes_per_rank = {modes_per_rank}")
-
+        
         # make sure all processes are ready to start
         self.comm.Barrier() 
         
         while not converged:
             iteration += 1 
-
-            # for mode in self.harmonics:
-            # this requires an even distrubution of ranks and modes
+            
             for idx in range(self.rank * modes_per_rank, (self.rank + 1) * modes_per_rank):
-
-                count = 0
                 mode = self.harmonics[idx]
-
+                
+                # Handle first iteration
                 if iteration == 1:
-
-                    Fr_local = self.computeNLT(self.helper_mats, station, mode[0], mode[1]) 
-                    Fr_global = np.asarray(self.comm.allgather(Fr_local))
-
-                    # need to move Fr into Fmn 
-                    if self.rank == 0:
-                        for jj in range(numModes):
-                            self.Fmn[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(Fr_global[jj, :])
-
-                    # broadcast the forcing to all ranks
-                    self.Fmn[station, :, :, :] = self.comm.bcast(self.Fmn[station, :, :, :], root=0)
-
-                if mode[0] == 0 and mode[1] == 0: # MFD
-                    #HACK: Using a new method to remove possible sources of error 
-                    # in computing the baseflow 
-                    # this is really intended for LPSE generally speaking because it won't account the the MFD 
-
-                    if "baseflow" in self.config["flow"].keys():
-                        if self.config["flow"]["baseflow"] == "external":
-                            self.useExternalMeanFlow(station)
-                        else:
-                            print_rz("Invalid option for baseflow in input file!")
-                    else:
-                        self.updateMeanFlow(self.helper_mats, station)
-
-                    q_local = np.copy(self.q[station, 0, 0, :]) 
-                    if self.config['simulation']['linear']:
-                        print_rz("Finished computing mean flow")
-                    else:
-                        print_rz("Finished computing the mean flow distortion")
-
+                    self._process_first_iteration(station, mode, Fr_local, Fr_global, numModes)
+                
+                # Handle mean flow distortion
+                if mode[0] == 0 and mode[1] == 0:
+                    q_local = self._handle_mean_flow_distortion(station)
+                    
                 self.comm.Barrier()
-                self.U  = self.comm.bcast(self.U,  root=0)
-                self.V  = self.comm.bcast(self.V,  root=0)
-                self.P  = self.comm.bcast(self.P,  root=0)
-                self.Ux = self.comm.bcast(self.Ux, root=0)
-                self.Vx = self.comm.bcast(self.Vx, root=0)
-                self.Uy = self.comm.bcast(self.Uy, root=0)
-                self.Vy = self.comm.bcast(self.Vy, root=0)
-                self.U_nlt0  = self.comm.bcast(self.U_nlt0,  root=0)
-                self.V_nlt0  = self.comm.bcast(self.V_nlt0,  root=0)
-                self.P_nlt0  = self.comm.bcast(self.P_nlt0,  root=0)
-                self.q[station, 0, 0, 0:self.Ny]    = self.comm.bcast(self.q[station, 0, 0, 0:self.Ny], root=0)
-                self.q[station, 0, 0, self.Ny:2*self.Ny] = self.comm.bcast(self.q[station, 0, 0, self.Ny:2*self.Ny], root=0)
-
-                # non-MFD modes
+                self._broadcast_flow_variables(station)
+                
+                # Handle non-MFD modes
                 delta_alpha_mn_local = 0.0
                 if not (mode[0] == 0 and mode[1] == 0):
-
-                    # converge alpha for each mode 
-                    # sub iteration procedure 
                     delta_alpha_mn_local = self.alpha_iteration(mode, station)
                     alpha_local = self.alpha[station, mode[0], mode[1]] 
                     q_local = self.q[station, mode[0], mode[1], :]
-
             
+            # Synchronize and gather results
             self.comm.Barrier()
             alpha_global = np.asarray(self.comm.allgather(alpha_local))
             q_global = np.asarray(self.comm.allgather(q_local))
             delta_alpha_mn = np.asarray(self.comm.allgather(delta_alpha_mn_local))
-
+            
             if any(value > self.config['numerical']['alpha_tol'] for value in delta_alpha_mn):
                 print_rz("Warning: at least one value of alpha failed to converge. Consider increasing the number of alpha iterations.\n")
-
+            
+            # Update global arrays on rank 0
             if self.rank == 0:
                 for jj in range(numModes):
                     self.alpha[station, self.harmonics[jj][0], self.harmonics[jj][1]] = np.copy(alpha_global[jj])
                     self.q[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(q_global[jj, :])
-
+            
+            # Broadcast updated arrays to all ranks
             self.alpha[station, :, :] = self.comm.bcast(self.alpha[station, :, :], root=0)
             self.q[station, :, :, :] = self.comm.bcast(self.q[station, :, :, :], root=0)
             self.comm.Barrier()
-
+            
             if self.config['simulation']['linear']:
-                # Nothing more to do for LPSE
                 converged = True
                 continue
-
-            # At this point, have performed alpha closure iterations on all modes 
-            # Now, let's recompute the NLTs for every mode and check convergence
-            # Check for NLT convergence
+                
+            # Check NLT convergence
             print_rz("===========================")
             print_rz("Checking NLT convergence...")
             print_rz("===========================\n")
-
-            delta_Fmn = np.zeros((self.harmonics.shape[0]))
-            for idx in range(self.rank * modes_per_rank, (self.rank + 1) * modes_per_rank):
-                mode = self.harmonics[idx]
-                Fr_local = self.computeNLT(self.helper_mats, station, mode[0], mode[1])
-
-                # if np.linalg.norm(Fr_local) == 0.0 or np.linalg.norm(self.Fmn[station, mode[0], mode[1], :]) == 0.0:
-                if np.linalg.norm(Fr_local) == 0.0:
-                    delta_Fmn_local = 0.0
-                else:
-                    delta_Fmn_local = np.linalg.norm(Fr_local - self.Fmn[station, mode[0], mode[1], :]) / np.linalg.norm(self.Fmn[station, mode[0], mode[1], :])
-
-            # need to gather 
-            self.comm.Barrier()
-            delta_Fmn = np.asarray(self.comm.allgather(delta_Fmn_local))
-            if any(value > 1e3 for value in delta_Fmn) and iteration > 5:
-                print_rz("PSE is unstable. Killing job.\n")
-                sys.exit()
-
-            print_rz("ΔFmn = \n")
-            print_rz(delta_Fmn)
-            print_rz("\n")
-            if np.max(delta_Fmn) < NL_tol:
-                print_rz("NLTs converged to tolerance")
-                print_rz(f"NLTs converged in {iteration} iterations")
-                converged = True
-
-                # adding in computation of PSE operator eigenvalues
-                for idx in range(self.rank * modes_per_rank, (self.rank + 1) * modes_per_rank):
-                    mode = self.harmonics[idx]
-                    if not (mode[0] == 0 and mode[1] == 0):
-                        self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer, setup_eigs=self.config['numerical']['compute_eigs'])
-                        self.setBCs(mode[0], mode[1], setup_eigs=self.config['numerical']['compute_eigs'])
-                        if self.config['numerical']['compute_eigs']:
-                            eigs_local = np.linalg.eigvals(self.L)
-
-            elif iteration > NL_max_iteration:
+            
+            converged, Fr_local = self._check_nlt_convergence(station, mode, Fr_local, 
+                                                            numModes, modes_per_rank, iteration)
+            
+            if not converged and iteration > NL_max_iteration:
                 print_rz("Warning: NLTs did not converge")
                 converged = True
-
-            # unclear if i need the barrier call here might just be slowing down the code
+            
+            # Compute eigenvalues if configured
+            if converged and self.config['numerical']['compute_eigs']:
+                eigs_local = self._compute_eigenvalues(station, mode, numModes, modes_per_rank)
+                eigs_global = np.asarray(self.comm.allgather(eigs_local))
+            
+            # Gather and update final results
             self.comm.Barrier()
             Fr_global = np.asarray(self.comm.allgather(Fr_local))
-
-            if self.config['numerical']['compute_eigs']:
-                eigs_global = np.asarray(self.comm.allgather(eigs_local))
-
-            # need to move Fr into Fmn 
+            
             if self.rank == 0:
                 for jj in range(numModes):
                     self.Fmn[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(Fr_global[jj, :])
                     if self.config['numerical']['compute_eigs']:
                         self.opEigs[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(eigs_global[jj, :])
-
-            # broadcast the forcing to all ranks
+            
+            # Broadcast the forcing to all ranks
             self.Fmn[station, :, :, :] = self.comm.bcast(self.Fmn[station, :, :, :], root=0)
 
     def alpha_iteration(self, mode, station):
@@ -1399,7 +1467,7 @@ class NLPSE():
         Parameters:
             station (int): Station index.
         """
-        
+
         # Use LST to initialize the PSE calculation
         if station == 0:
 
@@ -1442,14 +1510,20 @@ class NLPSE():
             self.harmonics = self.viableHarmonics(self.config['disturbance']['init_modes'], None, num_repeats=4)
             numModes = self.harmonics.shape[0]
             modes_per_rank = numModes // self.size
-            print_rz(f"{numModes} modes in this calculation:\n")
+            extra_modes = numModes % self.size
+            my_start = modes_per_rank * self.rank + min(self.rank, extra_modes)
+            my_end = my_start + modes_per_rank + (1 if self.rank < extra_modes else 0)
 
-            for idx in range(self.rank * modes_per_rank, (self.rank + 1) * modes_per_rank):
+            alpha_local = []
+            q_local = []
 
+            print(f"Rank {self.rank} handling modes {my_start} to {my_end-1}")
+
+            for idx in range(my_start, my_end):
                 mode = self.harmonics[idx]
                 if mode[0] == 0 and mode[1] == 0:
-                    alpha_local = 0.0 + 0.0j 
-                    q_local = np.zeros((4*self.Ny), dtype=complex)
+                    current_alpha = 0.0 + 0.0j
+                    current_q = np.zeros((4*self.Ny), dtype=complex)
 
                 elif mode[0] == 0 and mode[1] > 0:
 
@@ -1462,7 +1536,6 @@ class NLPSE():
                         print_rz(f"Initializing mode ({mode[0]}, {mode[1]}) with Orr-Sommerfeld",1)
                         Param_INIT['simulation']['type'] = "LST"
                         INIT_EQS = LST(self.Grid, Param_INIT, self.Baseflow, self.helper_mats)
-                        INIT_EQS.Solve(station)
 
                     else:
 
@@ -1472,24 +1545,6 @@ class NLPSE():
 
                         Param_INIT['simulation']['type'] = 'GORTLER'
                         INIT_EQS = Gortler(self.Grid, Param_INIT, self.Baseflow, self.helper_mats)
-                        INIT_EQS.Solve(station)
-
-                    alpha_local = INIT_EQS.alpha[station]
-                    q_local = INIT_EQS.q[:, station]
-
-                    # normalize the disturbance amplitude
-                    utemp = self.helper_mats['u_from_SPE'] @ q_local
-                    # norm1 = np.max(np.sqrt(2.0 * utemp * utemp.conj()))
-                    norm1 = np.max(np.abs(utemp))
-
-                    if mode[0] == mode1[0] and mode[1] == mode1[1]:
-                        q_local = self.config['flow']["Uinf"] * A0 / np.sqrt(2) * q_local / norm1
-
-                    elif mode[0] == mode2[0] and mode[1] == mode2[1]:
-                        q_local = self.config['flow']["Uinf"] * A1 / np.sqrt(2) * q_local / norm1
-
-                    else:
-                        q_local *= 0
 
                 elif mode[0] > 0:
 
@@ -1512,50 +1567,64 @@ class NLPSE():
                         INIT_EQS = LST(self.Grid, Param_INIT, self.Baseflow, self.helper_mats)
                         print(f"Initializing mode ({mode[0]}, {mode[1]}) with LST")
 
+                if mode[0] == 0 and mode[1] == 0:
+                    pass
+                else:
                     INIT_EQS.Solve(station)
 
-                    alpha_local = INIT_EQS.alpha[station]
-                    q_local = INIT_EQS.q[:, station]
-                    
-                    # normalize the disturbance amplitude
-                    utemp = self.helper_mats['u_from_SPE'] @ q_local
-                    norm1 = np.max(np.abs(utemp))
+                    current_alpha = INIT_EQS.alpha[station]
+                    current_q = INIT_EQS.q[:, station]
 
-                    if mode[0] == mode1[0] and mode[1] == mode1[1]:
+                # normalize the disturbance amplitude
+                utemp = self.helper_mats['u_from_SPE'] @ current_q
+                # norm1 = np.max(np.sqrt(2.0 * utemp * utemp.conj()))
+                norm1 = np.max(np.abs(utemp))
 
-                        q_local = self.config['flow']["Uinf"] * A0 / np.sqrt(2) * q_local / norm1
+                if mode[0] == mode1[0] and mode[1] == mode1[1]:
+                    current_q = self.config['flow']["Uinf"] * A0 / np.sqrt(2) * current_q / norm1
 
-                    elif mode[0] == mode2[0] and mode[1] == mode2[1]:
+                elif mode[0] == mode2[0] and mode[1] == mode2[1]:
+                    current_q = self.config['flow']["Uinf"] * A1 / np.sqrt(2) * current_q / norm1
 
-                        q_local = self.config['flow']["Uinf"] * A1 / np.sqrt(2) * q_local / norm1
-                    
-                    else:
-                        q_local *= 0
+                else:
+                    current_q *= 0
 
-            # make alpha exactly imaginary if real part is smaller than some threshold 
-            # this is important for modes of the form (0, n)
-            # threshold arbitrarily set
-            if np.real(alpha_local) <= 1e-8:
-                alpha_local = 1.0j * np.imag(alpha_local)
 
-            # need to allgather local data 
+                # make alpha exactly imaginary if real part is smaller than some threshold 
+                # this is important for modes of the form (0, n)
+                # threshold arbitrarily set
+                if np.real(current_alpha) <= 1e-8:
+                    current_alpha = 1.0j * np.imag(current_alpha)
+
+                alpha_local.append((idx, current_alpha))
+                q_local.append((idx, current_q))
+
+            # Synchronize before gathering results
             self.comm.Barrier()
-            alpha_global = np.asarray(self.comm.allgather(alpha_local))
-            q_global = np.asarray(self.comm.allgather(q_local))
+
+            # Gather results from all ranks
+            all_alpha = self.comm.allgather(alpha_local)
+            all_q = self.comm.allgather(q_local)
 
             if self.rank == 0:
-                for idx, mode in enumerate(self.harmonics):
-                    print(f"Mode {mode}: alpha = {alpha_global[idx]}")
-                for jj in range(numModes):
-                    self.alpha[station, self.harmonics[jj][0], self.harmonics[jj][1]] = np.copy(alpha_global[jj])
-                    self.q[station, self.harmonics[jj][0], self.harmonics[jj][1], :] = np.copy(q_global[jj, :])
+                print_rz(f"{numModes} modes in this calculation:\n")
+                # First combine all results into arrays
+                for rank_results in all_alpha:
+                    for idx, alpha in rank_results:
+                        print_rz(f"Mode {self.harmonics[idx]}: alpha = {alpha}")
+                        self.alpha[station, self.harmonics[idx][0], self.harmonics[idx][1]] = alpha
+
+                for rank_results in all_q:
+                    for idx, q in rank_results:
+                        self.q[station, self.harmonics[idx][0], self.harmonics[idx][1], :] = q
+
+            # Broadcast the complete arrays from rank 0 to all ranks
             self.alpha[station, :, :] = self.comm.bcast(self.alpha[station, :, :], root=0)
             self.q[station, :, :, :] = self.comm.bcast(self.q[station, :, :, :], root=0)
 
-            self.comm.Barrier() # i don't think this barrier is necessary to call 
             print_rz("All ranks have finished initializing the NLPSE calculation\n")
 
-        # Now use NLPSE
+            # Now use NLPSE
         else:
 
             # self.q[2*self.Ny:3*self.Ny, 0, :, :] = 0.0 # zero out the w equation
@@ -1602,7 +1671,7 @@ class NLPSE():
                     else:
                         self.q[station, m, n, :]  = np.copy(self.q[station - 1, m, n, :])
                         self.alpha[station, m, n] = np.copy(self.alpha[station - 1, m ,n])
-                    
+
             NLT_converged = False
 
             self.NL_iteration(NLT_converged, station)

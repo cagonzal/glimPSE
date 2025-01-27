@@ -632,33 +632,93 @@ class NLPSE():
         L1 = np.copy(Dy)
         R1 = 0.5 * (fkp1[ny:2*ny] + fk[ny:2*ny]) 
 
-        # set p(0) = 0
-        L1[0, :] = 0
-        L1[0, 0] = 1
-        R1[0]    = 0
+        np.save("DY_OP.npy", L1)
 
-        # L1 is Dy 
-        # therefore, setting  R1[-1] = 0 is equivalent to setting dp/dy = 0 at y->inf
-        R1[-1]    = 0 
+        #BUG: solution for p at station 1 must be incorrect 
+        # comparing the unperturbed base flow and the solution from 
+        # solving the BL equations below confirms that 
+        # i can forsee the issue coming from 
+        # 1) nondimensionalization / scaling
+        # 2) boundary conditions 
+        # 3) the equations being solved are not valid on this airfoil
+
+        if self.config['geometry']['type'] == "import_geom":
+
+            # set p(0) = 0 
+            L1[0, :] = 0
+            L1[0, 0] = 1
+            # R1[0]    = 0
+
+            R1[0]    = self.Baseflow.P[station, 0]
+
+            # set dp/dy(0)
+            dpdy = Dy @ self.Baseflow.P[station, :]
+
+            # R1[0] = dpdy[0]
+
+            # R1[1] = dpdy[1]
+            # R1[-1]   = dpdy[-1]
+
+            print_rz(f"Setting BC for dp/eta")
+            print_rz(f"dp/deta = {dpdy[-1]}")
+
+            if station == 1:
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(self.Baseflow.P[station,:], self.ygrid)
+                plt.tight_layout()
+                plt.savefig("baseflow_p.png")
+
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(dpdy, self.ygrid)
+                plt.tight_layout()
+                plt.savefig("baseflow_dpdeta.png")
+
+        else:
+
+            # set p(0) = 0
+            L1[0, :] = 0
+            L1[0, 0] = 1
+            R1[0]    = 0
+
+            # L1 is Dy 
+            # therefore, setting  R1[-1] = 0 is equivalent to setting dp/dy = 0 at y->inf
+            R1[-1]    = 0 
 
         Pbar = sp.linalg.solve(L1, R1)
-
         dpdx = (Pbar - Pk) / hx
+
+        # Pbar = self.Baseflow.P[station,:]
+        # dpdx = (self.Baseflow.P[station,:] - self.Baseflow.P[station-1,:]) / hx
 
         H = -np.diag(Vk) @ Dy + 1.0/Re * Dyy
         # H = -np.diag(Vk) @ Dy + 1.0/Re * Dyy - np.diag(one_over_h * Vk) * kappa
         L2 = (1. / hx) * np.diag(Uk) - 0.5 * H
         R2 = ((1. / hx) * np.diag(Uk) + 0.5 * H) @ Uk - dpdx + 0.5 * (fkp1[0:ny] + fk[0:ny])
 
-        # set U(0) = 0 
-        L2[0, :] = 0
-        L2[0, 0] = 1
-        R2[0]    = 0
+        if self.config['geometry']['type'] == "import_geom":
 
-        # set U(y->inf) = 1
-        L2[-1, :]  = 0
-        L2[-1, -1] = 1
-        R2[-1]     = self.config['flow']["Uinf"]
+            L2[0, :] = 0
+            L2[0, 0] = 1
+            R2[0]    = 0
+
+            # set U(y->inf) = unperturbed rans solution
+            L2[-1, :]  = 0
+            L2[-1, -1] = 1
+            R2[-1]     = self.Baseflow.U[station, -1]
+            print_rz(f"Setting BC for Uinf")
+            print_rz(f"Uinf = {self.Baseflow.U[station, -1]}")
+
+        else:
+
+            # set U(0) = 0 
+            L2[0, :] = 0
+            L2[0, 0] = 1
+            R2[0]    = 0
+
+            # set U(y->inf) = 1
+            L2[-1, :]  = 0
+            L2[-1, -1] = 1
+            R2[-1]     = self.config['flow']["Uinf"]
 
         Ubar = sp.linalg.solve(L2, R2)
 
@@ -666,13 +726,54 @@ class NLPSE():
         # L3 = Dy #+ np.diag(one_over_h) * kappa
         R3 = (-1.0 / hx) * (Ubar - Uk) #* np.diag(one_over_h)
 
-        # set V(0) = 0
-        L3[0, :] = 0
-        L3[0, 0] = 1
-        R3[0]    = 0
+        if self.config['geometry']['type'] == "import_geom":
 
-        # set dV/dy = 0 at y->inf
-        R3[-1]   = 0
+            # set V(0) = 0
+            L3[0, :] = 0
+            L3[0, 0] = 1
+            R3[0]    = 0
+
+            # set dV/dy = 0 at y->inf
+            R3[-1]   = self.Baseflow.Vy[station, -1]
+            print_rz(f"Setting BC for dV/deta")
+            print_rz(f"dV/deta = {self.Baseflow.Vy[station, -1]}")
+
+            if station == 1:
+
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(self.Baseflow.U[station,:], self.ygrid)
+                plt.tight_layout()
+                plt.savefig("baseflow_u.png")
+
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(Ubar, self.ygrid)
+                plt.tight_layout()
+                plt.savefig("ubar.png")
+
+                # plt.figure(figsize=(6,3),dpi=200)
+                # plt.plot(Pbar, self.ygrid)
+                # plt.tight_layout()
+                # plt.savefig("pbar.png")
+
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(self.Baseflow.V[station,:], self.ygrid)
+                plt.tight_layout()
+                plt.savefig("baseflow_v.png")
+
+                plt.figure(figsize=(6,3),dpi=200)
+                plt.plot(self.Baseflow.Vy[station,:], self.ygrid)
+                plt.tight_layout()
+                plt.savefig("baseflow_vy.png")
+
+        else:
+
+            # set V(0) = 0
+            L3[0, :] = 0
+            L3[0, 0] = 1
+            R3[0]    = 0
+
+            # set dV/dy = 0 at y->inf
+            R3[-1]   = 0
 
         Vbar = sp.linalg.solve(L3, R3)
         Wbar = np.zeros_like(Ubar)

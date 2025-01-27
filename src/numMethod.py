@@ -25,6 +25,14 @@ class derivativeOperators:
             self.Dy = self.set_D_FD(self.ygrid,d=1,order=2, output_full=True, uniform=False)
             self.Dyy = self.set_D_FD(self.ygrid,d=2,order=2, output_full=True, uniform=False)
 
+            pressure_ygrid = 0.5 * (self.ygrid[:-1] + self.ygrid[1:])
+            self.Dyp = self.set_D_FD(pressure_ygrid, d=1,order=2,output_full=True,uniform=False)
+
+            # self.Dyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=True,order=2,d=1,reduce_wall_order=True,output_full=True,periodic=False,uniform=False)
+            # self.Dyyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=False,order=2,d=2,reduce_wall_order=True,output_full=False,periodic=False,uniform=False)
+
+            print_rz(f"Dy shape = {self.Dy.shape}")
+
         else:
             raise ValueError("Invalid method chosen for derivatives")
 
@@ -65,7 +73,7 @@ class derivativeOperators:
             x = np.linalg.solve(np.matrix(A),b)
             return x
 
-    def set_D_FD(self, y,yP=None,order=2,T=2.*np.pi,d=2,reduce_wall_order=True,output_full=False,periodic=False,uniform=False):
+    def set_D_FD(self, y,yP=None,order=2,T=2.*np.pi,d=2,reduce_wall_order=False,output_full=False,periodic=False,uniform=False):
         '''
         Input:
             y: array of y values of channel
@@ -187,7 +195,7 @@ class derivativeOperators:
         if staggered:
             n = 2*y.size-1
             if full_staggered:
-                n = 2*y.size
+                n = 2*y.size # why 2y.size instead of 2y.size-1
         else:
             n=y.size
         ones=np.ones(n)
@@ -805,6 +813,7 @@ class surfaceImport:
         # first compute l0 
         # use physical nu 
         nu = 3.75e-06
+        rhoinf = 1.225
 
         Uinf = np.max(self.u_grid[0,:])
         # Uinf = 15.0 # global Uinf
@@ -829,6 +838,7 @@ class surfaceImport:
 
         self.u_grid /= Uinf
         self.v_grid /= Uinf
+        self.p_grid = self.p_grid / (0.5 * rhoinf * Uinf**2)
 
         self.xi_grid /= l0 
         self.eta_grid /= l0

@@ -118,6 +118,7 @@ def save_data(EQS, Grid, config, helper_mats, R, station, pickling=True):
             hf.create_dataset('Uy', data=EQS.Uy[:,0:station])
             hf.create_dataset('y', data=EQS.ygrid)
             hf.create_dataset('xi', data=Grid.xi_grid[0:station])
+            hf.create_dataset('P', data=EQS.P[:,0:station])
             try:
                 hf.create_dataset('xx', data=Grid.physicalX[0:station,0])
                 hf.create_dataset('yy', data=Grid.physicalY[0,:])

@@ -139,8 +139,6 @@ def initialize_curved_surface(config):
     Grid = nm.surfaceImport(x_field, y_field, u_field, v_field, p_field, grid['Nx'], geometry['ymax'], grid['Ny'], method = grid['method'], need_map=True, Uinf=flow['Uinf'], nu=flow['nu'])
 
     helper_mats = {}
-    #HACK:
-    # grid['Ny'] = 54
     helper_mats['zero'] = np.zeros((grid['Ny'], grid['Ny']))
     helper_mats['I'] = np.eye(grid['Ny'])
     I = helper_mats['I']

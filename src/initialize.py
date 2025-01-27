@@ -131,8 +131,6 @@ def initialize_curved_surface(config):
     grid = config['grid']
 
     # Read surface and velocity field data
-    # x_surface, y_surface = read_surface_data(geometry['surface_file'])
-    # x_field, y_field, u_field, v_field, p_field = read_velocity_field(flow['velocity_file'])
     x_field, y_field, u_field, v_field, p_field, kappa_field = read_velocity_field(flow['velocity_file'])
 
     # Create CurvedSurfaceGrid object

@@ -573,242 +573,407 @@ class surfaceImport:
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
 
+        # store original field data
         self.x_field = X
         self.y_field = Y
         self.u_field = U
         self.v_field = V
         self.p_field = P
+
         self.Nx = N_xi
         self.Ny = N_eta
         self.eta_max = eta_max
         self.method = method
         self.need_map = need_map
+
+        # initialize staggered grid arrays 
+        self.xi_c = None # cell centers xi
+        self.xi_u = None # u-velocity xi positions
+        self.xi_v = None # v-velocity xi positions
+
+        self.eta_c = None # cell centers eta
+        self.eta_u = None # u-velocity eta positions
+        self.eta_v = None # v-velocity eta positions
+
+        # initialize field arrays on staggered grid
+        self.u_stag = None # u-velocity on staggered grid
+        self.v_stag = None # v-velocity on staggered grid
+        self.p_stag = None # pressure on cell centers
+
+        # metric terms at different locations 
+        self.J_c = None # jacobian at cell centers
+        self.J_u = None # jacobian at u-vel points
+        self.J_v = None # jacobian at v-vel points
         
-        self.xi_grid = None
-        self.hx = None
-        self.eta_grid = None
-        self.xgrid = None
-        self.ygrid = None
-        self.u_grid = None
-        self.v_grid = None
-        self.p_grid = None
-        self.kappa = None
+        # self.xi_grid = None
+        # self.hx = None
+        # self.eta_grid = None
+        # self.xgrid = None
+        # self.ygrid = None
+        # self.u_grid = None
+        # self.v_grid = None
+        # self.p_grid = None
+        # self.kappa = None
 
         self.Uinf = Uinf
         self.nu = nu
 
-        self.generate_curvilinear_grid()
-        self.transform_velocities()
+        self.generate_staggered_grid()
+        self.compute_metrics_staggered()
+        self.transform_velocities_staggered()
         self.normalize_fields()
 
-        derivativeOps = derivativeOperators(self.ygrid, self.method)
-        self.Dy = derivativeOps.Dy
-        self.Dyy = derivativeOps.Dyy
+        # create derivative operators for different grid locations
+        self.setup_derivative_operators()
 
-        self.check_gcl_static_2d()
+        # derivativeOps = derivativeOperators(self.ygrid, self.method)
+        # self.Dy = derivativeOps.Dy
+        # self.Dyy = derivativeOps.Dyy
 
-    def generate_curvilinear_grid(self):
-        """Generate a curvilinear grid based on the input data."""
+        # self.check_gcl_static_2d()
 
-        from scipy.integrate import cumulative_trapezoid
-        X = self.x_field
-        Y = self.y_field
-        x_surface, y_surface = X[:, 0], Y[:, 0]
-
+    def calculate_surface_distance(self):
+        """Calculate distance along the airfoil surface."""
+        x_surface, y_surface = self.x_field[:, 0], self.y_field[:, 0]
+        
         # Calculate theta (angle of tangent to airfoil surface)
         dx = np.gradient(x_surface)
         dy = np.gradient(y_surface)
-        theta = np.arctan2(dy, dx)
+        self.theta_surface = np.arctan2(dy, dx)
         
-        # Calculate x1 (distance along airfoil surface)
+        # Calculate distance along airfoil surface
         ds = np.sqrt(dx**2 + dy**2)
-        x1 = cumulative_trapezoid(ds, initial=0)  # This ensures x1 has the same length as airfoil_x and airfoil_y
+        return np.cumsum(ds)
 
-        xi_distribution = 'uniform'
-        # Generate ξ distribution
-        if xi_distribution == 'uniform':
-            xi = np.linspace(0, x1[-1], self.Nx)
-        elif xi_distribution == 'cosine':
-            xi = x1[-1] * 0.5 * (1 - np.cos(np.linspace(0, np.pi, self.Nx)))
-        else:
-            raise ValueError("Invalid ξ_distribution. Choose 'uniform' or 'cosine'.")
+    def generate_chebyshev_grid(self, eta_max, N):
+        """Generate Chebyshev-distributed points in the eta direction."""
+        a = 0.0
+        b = eta_max
+        eta_buf = np.cos(np.pi * np.arange(N-1, -1, -1) / (N-1))
+        return b * (eta_buf + 1) / 2.0 + a * (1.0 - eta_buf) / 2.0
 
-        # Generate eta coordinates normal to the surface
-        eta_max = self.eta_max
-        if self.method == "cheby":
-            a = 0.0
-            b = eta_max
-            eta_buf = np.cos(np.pi*np.arange(self.Ny-1,-1,-1)/(self.Ny-1))
-            eta = b*(eta_buf+1)/2.0 + a*(1.0-eta_buf)/2.0
-        elif self.method == "cheby2":
-            a = 0.0
-            b = eta_max
-            y_i = 0.2 * eta_max
-            eta_buf = np.cos(np.pi*np.arange(self.Ny-1,-1,-1)/(self.Ny-1))
-            buf1 = y_i * b / (b - 2 * y_i)
-            buf2 = 1 + 2 * buf1 / b
-            eta = buf1 * (1 + eta_buf) / (buf2 - eta_buf)
-        elif self.method == "geometric":
-            r = 1.1 # Growth rate
-            eta = eta_max * (1 - r**np.arange(self.Ny)) / (1 - r**self.Ny)
-        elif self.method == "uniform":
-            eta = np.linspace(0, eta_max, self.Ny)
-        else:
-            raise ValueError("Invalid eta distribution. Choose cheby, cheby2, geometric, or uniform.")
+    def interpolate_theta_to_location(self, xi, location):
+        """Interpolate surface angle to specific grid location."""
+        if location == 'c':
+            return np.interp(xi[:, 0], self.xi_c, self.theta_surface)
+        elif location == 'u':
+            return np.interp(xi[:, 0], self.xi_c, self.theta_surface)
+        elif location == 'v':
+            return np.interp(xi[:, 0], self.xi_c, self.theta_surface)
 
-        X_curv = np.zeros((self.Nx, self.Ny))
-        Y_curv = np.zeros((self.Nx, self.Ny))
+    def interpolate_kappa_to_location(self, xi, location):
+        """Interpolate curvature to specific grid location."""
+        kappa_surface = -np.gradient(self.theta_surface, self.xi_c)
+        if location == 'c':
+            return np.interp(xi[:, 0], self.xi_c, kappa_surface)[:, np.newaxis]
+        elif location == 'u':
+            return np.interp(xi[:, 0], self.xi_c, kappa_surface)[:, np.newaxis]
+        elif location == 'v':
+            return np.interp(xi[:, 0], self.xi_c, kappa_surface)[:, np.newaxis]
 
-        try:
-            # Interpolate airfoil coordinates and theta to xi points
-            x_surface_interp = interp1d(x1, x_surface, kind='linear', bounds_error=False, fill_value='extrapolate')
-            y_surface_interp = interp1d(x1, y_surface, kind='linear', bounds_error=False, fill_value='extrapolate')
-            theta_interp = interp1d(x1, theta, kind='linear', bounds_error=False, fill_value='extrapolate')
-        except ValueError as e:
-            print_rz(f"Interpolation error: {e}")
-            print_rz(f"x1 shape: {x1.shape}, x_surface shape: {x_surface.shape},  y_surface shape: {y_surface.shape}, theta shape: {theta.shape}")
-            raise
-
-        self.theta = theta_interp(xi)
-        dtheta_dxi = np.gradient(theta_interp(xi), xi, edge_order=2)
-        K1 = -1.0 * dtheta_dxi
-
-        for i, xi_val in enumerate(xi):
-            x_s = x_surface_interp(xi_val)
-            y_s = y_surface_interp(xi_val)
-            theta_s = theta_interp(xi_val)
-            
-            # Calculate h (first Lamé coefficient)
-            h = 1 + eta * K1[i]
-            
-            # Generate grid points
-            X_curv[i, :] = x_s - eta * np.sin(theta_s)
-            Y_curv[i, :] = y_s + eta * np.cos(theta_s)
-
-        self.physicalX = X_curv
-        self.physicalY = Y_curv
-
-        self.xgrid = xi
-        self.ygrid = eta
-
-        self.hx = np.diff(xi)
-
-        self.xi = xi
-        self.eta = eta
-
-        xi_grid = np.tile(xi[:, np.newaxis], (1, self.Ny))
-        eta_grid = np.tile(eta[np.newaxis, :], (self.Nx,1))
-
-        self.xi_grid = xi_grid
-        self.eta_grid = eta_grid
-        self.x_grid = self.xi_grid
-        self.y_grid = self.eta_grid
-
-        # input kappa is a 1d vector
-        # need to expand it for consistency reasons
-        d2theta_dxi2 = np.gradient(dtheta_dxi, xi)
-        kappa = K1
-        self.kappa = kappa[:, np.newaxis]
-
-        self.h = 1 + self.kappa * self.eta_grid 
-        self.dtheta_dxi = dtheta_dxi[:, np.newaxis]
-        self.d2theta_dxi2 = d2theta_dxi2[:, np.newaxis]
-
-    def compute_metrics(self):
-        # Calculate metrics of the coordinate transformation
-
-        # Initialize arrays for metric coefficients
-        num_xi  = self.Nx
-        num_eta = self.Ny
-
-        self.x_xi  = np.zeros((num_xi, num_eta))
-        self.x_eta = np.zeros((num_xi, num_eta))
-        self.y_xi  = np.zeros((num_xi, num_eta))
-        self.y_eta = np.zeros((num_xi, num_eta))
-
-        self.xi_x  = np.zeros((num_xi, num_eta))
-        self.xi_y  = np.zeros((num_xi, num_eta))
-        self.eta_x = np.zeros((num_xi, num_eta))
-        self.eta_y = np.zeros((num_xi, num_eta))
-
-        for i in range(num_xi):
-            h                = self.h[i,:]
-
-            self.x_xi[i, :]  = h * np.cos(self.theta[i])
-            self.x_eta[i, :] = -np.sin(self.theta[i])
-            self.y_xi[i, :]  = h * np.sin(self.theta[i])
-            self.y_eta[i, :] = np.cos(self.theta[i])
-
-            self.xi_x[i, :]  = np.cos(self.theta[i]) / h
-            self.xi_y[i, :]  = np.sin(self.theta[i]) / h
-            self.eta_x[i, :] = -1.0 * np.sin(self.theta[i])
-            self.eta_y[i, :] = np.cos(self.theta[i])
-
-        self.J11 = self.xi_x
-        self.J12 = self.xi_y
-        self.J21 = self.eta_x
-        self.J22 = self.eta_y
-
-        # Calculate Jacobian
-        self.J = self.x_xi * self.y_eta - self.x_eta * self.y_xi
-
-        # Compute higher order metric terms
-
-        self.dJ11_dxi = np.gradient(self.J11, self.xi, axis=0, edge_order=2)
-        self.dJ11_deta = np.gradient(self.J11, self.eta, axis=1, edge_order=2)
-
-        self.dJ12_dxi = np.gradient(self.J12, self.xi, axis=0, edge_order=2)
-        self.dJ12_deta = np.gradient(self.J12, self.eta, axis=1, edge_order=2)
+    def calculate_physical_coordinates(self, xi, eta, theta):
+        """Calculate physical (x,y) coordinates from curvilinear coordinates."""
+        # Get surface coordinates at xi locations
+        x_surface = np.interp(xi[:, 0], self.xi_c, self.x_field[:, 0])
+        y_surface = np.interp(xi[:, 0], self.xi_c, self.y_field[:, 0])
         
-        self.dJ21_dxi = np.gradient(self.J21, self.xi, axis=0, edge_order=2)
-        self.dJ21_deta = np.gradient(self.J21, self.eta, axis=1, edge_order=2)
+        # Calculate physical coordinates
+        x_phys = np.zeros_like(xi)
+        y_phys = np.zeros_like(eta)
+        
+        for i in range(xi.shape[0]):
+            x_phys[i, :] = x_surface[i] - eta[i, :] * np.sin(theta[i])
+            y_phys[i, :] = y_surface[i] + eta[i, :] * np.cos(theta[i])
+            
+        return x_phys, y_phys
 
-        self.dJ22_dxi = np.gradient(self.J22, self.xi, axis=0, edge_order=2)
-        self.dJ22_deta = np.gradient(self.J22, self.eta, axis=1, edge_order=2)
+    def interpolate_to_u_points(self, field):
+        """Interpolate a field to u-velocity points (staggered in xi)."""
+        # Get source points (original field coordinates)
+        points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
+        values = field.flatten()
+        
+        # Calculate physical coordinates for u-points
+        x_u_phys, y_u_phys = self.calculate_physical_coordinates(
+            self.xi_grid_u, 
+            self.eta_grid_u, 
+            self.theta_u
+        )
+        
+        # Create target points array for interpolation
+        xi = np.column_stack((x_u_phys.flatten(), y_u_phys.flatten()))
+        
+        # Interpolate using both linear and cubic methods
+        # Start with linear for robustness
+        field_u = griddata(points, values, xi, method='linear')
+        
+        # Fill any remaining NaNs with nearest neighbor interpolation
+        nan_mask = np.isnan(field_u)
+        if np.any(nan_mask):
+            field_u[nan_mask] = griddata(
+                points, 
+                values, 
+                xi[nan_mask], 
+                method='nearest'
+            )
+            
+        return field_u.reshape(x_u_phys.shape)
 
-    def transform_velocities(self):
-        """
-        This function transform Cartesian velocities into xi and eta aligned velocties. It interpolates onto a reduced grid if necessary. 
-        """
-        print_rz(f"U Cartesian Shape: {self.u_field.shape}")
-        print_rz(f"U Curvilinear Shape: {self.physicalX.shape}")
-        if self.u_field.shape != self.physicalX.shape:
-            # print_rz(f"These shapes do not match. Interpolation required.")
-            points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
-            utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    def interpolate_to_v_points(self, field):
+        """Interpolate a field to v-velocity points (staggered in eta)."""
+        # Get source points (original field coordinates)
+        points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
+        values = field.flatten()
+        
+        # Calculate physical coordinates for v-points
+        x_v_phys, y_v_phys = self.calculate_physical_coordinates(
+            self.xi_grid_v, 
+            self.eta_grid_v, 
+            self.theta_v
+        )
+        
+        # Create target points array for interpolation
+        xi = np.column_stack((x_v_phys.flatten(), y_v_phys.flatten()))
+        
+        # Interpolate using both linear and cubic methods
+        # Start with linear for robustness
+        field_v = griddata(points, values, xi, method='linear')
+        
+        # Fill any remaining NaNs with nearest neighbor interpolation
+        nan_mask = np.isnan(field_v)
+        if np.any(nan_mask):
+            field_v[nan_mask] = griddata(
+                points, 
+                values, 
+                xi[nan_mask], 
+                method='nearest'
+            )
+            
+        return field_v.reshape(x_v_phys.shape)
+
+    def interpolate_to_cell_centers(self, field):
+        """Interpolate a field to cell centers."""
+        # Get source points (original field coordinates)
+        points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
+        values = field.flatten()
+        
+        # Calculate physical coordinates for cell centers
+        x_c_phys, y_c_phys = self.calculate_physical_coordinates(
+            self.xi_grid_c, 
+            self.eta_grid_c, 
+            self.theta_c
+        )
+        
+        # Create target points array for interpolation
+        xi = np.column_stack((x_c_phys.flatten(), y_c_phys.flatten()))
+        
+        # Interpolate using both linear and cubic methods
+        # Start with linear for robustness
+        field_c = griddata(points, values, xi, method='linear')
+        
+        # Fill any remaining NaNs with nearest neighbor interpolation
+        nan_mask = np.isnan(field_c)
+        if np.any(nan_mask):
+            field_c[nan_mask] = griddata(
+                points, 
+                values, 
+                xi[nan_mask], 
+                method='nearest'
+            )
+            
+        return field_c.reshape(x_c_phys.shape)
+
+    def interpolate_v_to_u(self, v_field):
+        """Interpolate v-velocity from v-points to u-points."""
+        v_interp = np.zeros_like(self.xi_grid_u)
+        for i in range(self.Nx-1):
+            v_interp[i, :] = np.interp(self.eta_u, self.eta_v, 
+                                     0.5*(v_field[i, :] + v_field[i+1, :]))
+        return v_interp
+
+    def interpolate_u_to_v(self, u_field):
+        """Interpolate u-velocity from u-points to v-points."""
+        u_interp = np.zeros_like(self.xi_grid_v)
+        for j in range(self.Ny-1):
+            u_interp[:, j] = np.interp(self.xi_v, self.xi_u,
+                                     0.5*(u_field[:, j] + u_field[:, j+1]))
+        return u_interp
+
+    def generate_staggered_grid(self):
+        """Generate staggered grids for different variables."""
+        # Generate base xi distribution
+        x1 = self.calculate_surface_distance()
+        
+        # Generate cell-centered xi grid
+        xi_distribution = 'uniform'
+        if xi_distribution == 'uniform':
+            self.xi_c = np.linspace(0, x1[-1], self.Nx)
         else:
-            # print_rz("These shapes match. Interpolation is not required.")
-            points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
-            utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+            # Add other distribution methods as needed
+            raise ValueError*("Invalid xi_distribution.")
+        
+        # Generate staggered xi grids
+        # U-velocity points are staggered in x (xi)
+        self.xi_u = 0.5 * (self.xi_c[:-1] + self.xi_c[1:])
+        # V-velocity points use cell-centered xi
+        self.xi_v = self.xi_c.copy()
+        
+        # Generate eta grids
+        if self.method == "cheby":
+            self.eta_c = self.generate_chebyshev_grid(self.eta_max, self.Ny)
+            # U-velocity points use cell-centered eta
+            self.eta_u = self.eta_c.copy()
+            # V-velocity points are staggered in y (eta)
+            self.eta_v = 0.5 * (self.eta_c[:-1] + self.eta_c[1:])
+        elif self.method == "geometric":
+            r = 1.1 # growth rate 
+            self.eta_c = self.eta_max * (1 - r**np.arange(self.Ny)) / (1 - r**self.Ny)
+            # U-velocity points use cell-centered eta
+            self.eta_u = self.eta_c.copy()
+            # V-velocity points are staggered in y (eta)
+            self.eta_v = 0.5 * (self.eta_c[:-1] + self.eta_c[1:])
+        elif self.method == "uniform":
+            eta_c = np.linspace(0, eta_max, self.Ny)
+            # U-velocity points use cell-centered eta
+            self.eta_u = self.eta_c.copy()
+            # V-velocity points are staggered in y (eta)
+            self.eta_v = 0.5 * (self.eta_c[:-1] + self.eta_c[1:])
+        else:
+            raise ValueError("Invalid eta ditribution. Choose cheby, geometric, or uniform")
 
-        self.compute_metrics()
+        # Create 2D grid arrays
+        self.setup_2d_grids()
 
-        U_xi = self.xi_x * utemp + self.xi_y * vtemp
-        U_eta = self.eta_x * utemp + self.eta_y * vtemp
+    def setup_2d_grids(self):
+        """Create 2D grid arrays for different variable locations."""
+        # Cell centers
+        self.xi_grid_c = np.tile(self.xi_c[:, np.newaxis], (1, self.Ny))
+        self.eta_grid_c = np.tile(self.eta_c[np.newaxis, :], (self.Nx, 1))
+        
+        # U-velocity points
+        self.xi_grid_u = np.tile(self.xi_u[:, np.newaxis], (1, self.Ny))
+        self.eta_grid_u = np.tile(self.eta_u[np.newaxis, :], (self.Nx-1, 1))
+        
+        # V-velocity points
+        self.xi_grid_v = np.tile(self.xi_v[:, np.newaxis], (1, self.Ny-1))
+        self.eta_grid_v = np.tile(self.eta_v[np.newaxis, :], (self.Nx, 1))
 
-        self.u_grid = U_xi
-        self.v_grid = U_eta
-        self.p_grid = ptemp
+    def compute_metrics_staggered(self):
+        """Compute metric terms at different grid locations."""
+        # Compute basic metric terms at cell centers
+        self.compute_metrics_at_location(self.xi_grid_c, self.eta_grid_c, 'c')
+        
+        # Compute metrics at u-velocity points
+        self.compute_metrics_at_location(self.xi_grid_u, self.eta_grid_u, 'u')
+        
+        # Compute metrics at v-velocity points
+        self.compute_metrics_at_location(self.xi_grid_v, self.eta_grid_v, 'v')
+
+    def compute_metrics_at_location(self, xi, eta, location):
+        """Compute metric terms at specific grid location."""
+        # Calculate theta and derivatives at the specified location
+        theta = self.interpolate_theta_to_location(xi, location)
+
+        # Store theta for this location
+        setattr(self, f'theta_{location}', theta)
+        
+        # Initialize metric arrays for this location
+        x_xi = np.zeros_like(xi)
+        x_eta = np.zeros_like(xi)
+        y_xi = np.zeros_like(xi)
+        y_eta = np.zeros_like(xi)
+        
+        # Compute h (first Lamé coefficient) at this location
+        h = 1 + eta * self.interpolate_kappa_to_location(xi, location)
+        
+        # Calculate metric terms
+        for i in range(xi.shape[0]):
+            x_xi[i, :] = h[i, :] * np.cos(theta[i])
+            x_eta[i, :] = -np.sin(theta[i])
+            y_xi[i, :] = h[i, :] * np.sin(theta[i])
+            y_eta[i, :] = np.cos(theta[i])
+        
+        # Store metrics with appropriate suffix
+        setattr(self, f'x_xi_{location}', x_xi)
+        setattr(self, f'x_eta_{location}', x_eta)
+        setattr(self, f'y_xi_{location}', y_xi)
+        setattr(self, f'y_eta_{location}', y_eta)
+
+        # store h for this location 
+        setattr(self, f'h_{location}', h)
+        
+        # Compute Jacobian at this location
+        J = x_xi * y_eta - x_eta * y_xi
+        setattr(self, f'J_{location}', J)
+
+        # compute contravariant metric terms
+        # these are needed for the velocity transformation 
+
+        xi_x = y_eta / J 
+        xi_y = -x_eta / J 
+        eta_x = -y_xi / J 
+        eta_y = x_xi / J
+
+        # store contravariant metrics
+        setattr(self, f"xi_x_{location}", xi_x)
+        setattr(self, f"xi_y_{location}", xi_y)
+        setattr(self, f"eta_x_{location}", eta_x)
+        setattr(self, f"eta_y_{location}", eta_y)
+
+    def transform_velocities_staggered(self):
+        """Transform Cartesian velocities to curvilinear coordinates on staggered grid."""
+        # Interpolate Cartesian velocities to appropriate staggered locations
+        u_cart = self.interpolate_to_u_points(self.u_field)
+        v_cart = self.interpolate_to_v_points(self.v_field)
+
+        print(f"u_field = {self.u_field}")
+        print(f"v_field = {self.v_field}")
+
+        print(f"u_cart = {u_cart}")
+        print(f"v_cart = {v_cart}")
+        
+        # Transform velocities using metrics at appropriate locations
+        self.u_stag = (getattr(self, 'xi_x_u') * u_cart + 
+                      getattr(self, 'xi_y_u') * self.interpolate_v_to_u(v_cart))
+        
+        self.v_stag = (getattr(self, 'eta_x_v') * self.interpolate_u_to_v(u_cart) + 
+                      getattr(self, 'eta_y_v') * v_cart)
+        
+        # Interpolate pressure to cell centers
+        self.p_stag = self.interpolate_to_cell_centers(self.p_field)
+
+    def setup_derivative_operators(self):
+        """Create derivative operators for different grid locations."""
+        # Create operators for cell centers
+        derivativeOps_c = derivativeOperators(self.eta_c, self.method)
+        self.Dy_c = derivativeOps_c.Dy
+        self.Dyy_c = derivativeOps_c.Dyy
+        
+        # Create operators for u-velocity points
+        derivativeOps_u = derivativeOperators(self.eta_u, self.method)
+        self.Dy_u = derivativeOps_u.Dy
+        self.Dyy_u = derivativeOps_u.Dyy
+        
+        # Create operators for v-velocity points
+        derivativeOps_v = derivativeOperators(self.eta_v, self.method)
+        self.Dy_v = derivativeOps_v.Dy
+        self.Dyy_v = derivativeOps_v.Dyy
 
     def normalize_fields(self):
-
-        # first compute l0 
-        # use physical nu 
+        """Normalize all fields and metrics."""
+        # Compute reference quantities
         nu = 3.75e-06
         rhoinf = 1.225
-
-        Uinf = np.max(self.u_grid[0,:])
-        # Uinf = 15.0 # global Uinf
+        
+        # Get Uinf from u-velocity field
+        Uinf = np.max(self.u_stag[0,:])
+        
+        # Calculate characteristic length
         l0 = np.sqrt(nu * self.x_field[0,0] / Uinf)
-        # try l0 with sqrt(2) in the numerator
-        # l0 = np.sqrt(2 * nu * self.x_field[0,0] / Uinf)
         Re = Uinf * l0 / nu
         nu_nondim = 1.0 / Re
-        # Nondimensionalizing the flow 
+        
+        # Print normalization parameters
         print_rz(f"Nondimensionalizing the flow field...")
         print_rz(f"l0 = {l0}")
         print_rz(f"U_inf = {Uinf}")
@@ -816,93 +981,362 @@ class surfaceImport:
         print_rz(f"Re = {Re}")
         print_rz(f"nu nondim = {nu_nondim}")
 
-        f = 1860 # dimensional frequency in Hz
+        # Calculate frequency parameters if needed
+        f = 1860  # dimensional frequency in Hz
         omega_nondim = 2 * np.pi * f * Re * nu / Uinf**2
         F = omega_nondim / Re * 1e6
         print_rz(f"omega nondim = {omega_nondim}")
         print_rz(f"F = {F}")
 
-        self.u_grid /= Uinf
-        self.v_grid /= Uinf
-        self.p_grid = self.p_grid / (0.5 * rhoinf * Uinf**2)
-
-        self.xi_grid /= l0 
-        self.eta_grid /= l0
-        self.xi /= l0 
-        self.eta /= l0 
-        # uncommenting line below ruins the computation of d99...
-        # is it cause ygrid references eta?
-        self.xgrid = self.xi
-        self.ygrid = self.eta
-
-        self.dtheta_dxi *= l0
-        self.d2theta_dxi2 *= l0**2
-        self.hx = np.diff(self.xi)
-
-        self.dJ11_dxi *= l0
-        self.dJ11_deta *= l0
-
-        self.dJ12_dxi *= l0
-        self.dJ12_deta *= l0
+        # Normalize velocities
+        self.u_stag /= Uinf
+        self.v_stag /= Uinf
         
-        self.dJ21_dxi *= l0
-        self.dJ21_deta *= l0
+        # Normalize pressure
+        self.p_stag = self.p_stag / (0.5 * rhoinf * Uinf**2)
 
-        self.dJ22_dxi *= l0
-        self.dJ22_deta *= l0
+        # Normalize grid coordinates for all locations
+        for loc in ['c', 'u', 'v']:
+            # Normalize xi grids
+            xi_grid = getattr(self, f'xi_grid_{loc}')
+            setattr(self, f'xi_grid_{loc}', xi_grid / l0)
+            
+            # Normalize eta grids
+            eta_grid = getattr(self, f'eta_grid_{loc}')
+            setattr(self, f'eta_grid_{loc}', eta_grid / l0)
 
-
-    def check_gcl_static_2d(self, tolerance=1e-10):
-        """
-        Check if the 2D static curvilinear grid satisfies the GCL.
-        """
-
-        J = self.J
-        y_eta = self.y_eta
-        y_xi = self.y_xi
-        x_eta = self.x_eta
-        x_xi = self.x_xi
-        # Check GCL conditions
-
-        #TODO:
-        # should compute gradient in eta direction using my FD or Chebyshev operators
-        gcl_x = np.gradient(J * y_eta, self.xi, axis=0, edge_order=1) - np.gradient(J * y_xi, self.eta, axis=1, edge_order=1)
-        gcl_y = -np.gradient(J * x_eta, self.xi, axis=0, edge_order=1) + np.gradient(J * x_xi, self.eta, axis=1, edge_order=1)
-
-        # gcl_x = np.gradient(J * y_eta, self.xi, axis=0) - self.Dy @ (J * y_xi)
-        # gcl_y = -np.gradient(J * x_eta, self.xi, axis=0) + self.Dy @ (J * x_xi)
+        # Normalize 1D coordinate arrays
+        self.xi_c /= l0
+        self.xi_u /= l0
+        self.xi_v /= l0
+        self.eta_c /= l0
+        self.eta_u /= l0
+        self.eta_v /= l0
         
-        gcl_satisfied = (np.abs(gcl_x) < tolerance).all() and (np.abs(gcl_y) < tolerance).all()
+        # Update reference coordinates
+        self.xgrid = self.xi_c
+        self.ygrid = self.eta_c
 
-        max_error = max(np.abs(gcl_x).max(), np.abs(gcl_y).max())
-        mean_error = max(np.abs(gcl_x).mean(), np.abs(gcl_y).mean())
+        # Normalize metric derivatives for all locations
+        for loc in ['c', 'u', 'v']:
+            # Get the Jacobian for this location
+            J = getattr(self, f'J_{loc}')
+            dtheta_dxi = getattr(self, f'dtheta_dxi_{loc}', None)
+            d2theta_dxi2 = getattr(self, f'd2theta_dxi2_{loc}', None)
+            
+            if dtheta_dxi is not None:
+                setattr(self, f'dtheta_dxi_{loc}', dtheta_dxi * l0)
+            if d2theta_dxi2 is not None:
+                setattr(self, f'd2theta_dxi2_{loc}', d2theta_dxi2 * l0**2)
 
-        if gcl_satisfied:
-            print_rz(f"GCL condition satisfied...")
-        else:
-            print_rz(f"GCL condition is NOT satisfied!")
-            print_rz(f"Max GCL error = {max_error}")
-            print_rz(f"Mean GCL error = {mean_error}")
+            # Normalize metric derivatives if they exist
+            for metric in ['J11', 'J12', 'J21', 'J22']:
+                for deriv in ['dxi', 'deta']:
+                    attr_name = f'd{metric}_d{deriv}_{loc}'
+                    if hasattr(self, attr_name):
+                        val = getattr(self, attr_name)
+                        setattr(self, attr_name, val * l0)
 
-            plt.figure(figsize=(6,3), dpi=200)
-            plt.contourf(self.xi_grid, self.eta_grid, np.log10(np.abs(gcl_x)), levels=200, cmap='icefire')
-            plt.xlabel(r'$\xi$')
-            plt.ylabel(r'$\eta$')
-            plt.colorbar()
-            plt.title('GCL x')
-            plt.tight_layout()
-            plt.savefig('gcl_x.png')
+        # Update grid spacing
+        if hasattr(self, 'hx'):
+            self.hx = np.diff(self.xi_c)
 
-            plt.figure(figsize=(6,3), dpi=200)
-            plt.contourf(self.xi_grid, self.eta_grid, np.log10(np.abs(gcl_y)), levels=200, cmap='icefire')
-            plt.xlabel(r'$\xi$')
-            plt.ylabel(r'$\eta$')
-            plt.title('GCL y')
-            plt.colorbar()
-            plt.tight_layout()
-            plt.savefig('gcl_y.png')
-        
-        return gcl_satisfied, max_error
+    # def generate_curvilinear_grid(self):
+    #     """Generate a curvilinear grid based on the input data."""
+    #
+    #     from scipy.integrate import cumulative_trapezoid
+    #     X = self.x_field
+    #     Y = self.y_field
+    #     x_surface, y_surface = X[:, 0], Y[:, 0]
+    #
+    #     # Calculate theta (angle of tangent to airfoil surface)
+    #     dx = np.gradient(x_surface)
+    #     dy = np.gradient(y_surface)
+    #     theta = np.arctan2(dy, dx)
+    #     
+    #     # Calculate x1 (distance along airfoil surface)
+    #     ds = np.sqrt(dx**2 + dy**2)
+    #     x1 = cumulative_trapezoid(ds, initial=0)  # This ensures x1 has the same length as airfoil_x and airfoil_y
+    #
+    #     xi_distribution = 'uniform'
+    #     # Generate ξ distribution
+    #     if xi_distribution == 'uniform':
+    #         xi = np.linspace(0, x1[-1], self.Nx)
+    #     elif xi_distribution == 'cosine':
+    #         xi = x1[-1] * 0.5 * (1 - np.cos(np.linspace(0, np.pi, self.Nx)))
+    #     else:
+    #         raise ValueError("Invalid ξ_distribution. Choose 'uniform' or 'cosine'.")
+    #
+    #     # Generate eta coordinates normal to the surface
+    #     eta_max = self.eta_max
+    #     if self.method == "cheby":
+    #         a = 0.0
+    #         b = eta_max
+    #         eta_buf = np.cos(np.pi*np.arange(self.Ny-1,-1,-1)/(self.Ny-1))
+    #         eta = b*(eta_buf+1)/2.0 + a*(1.0-eta_buf)/2.0
+    #     elif self.method == "cheby2":
+    #         a = 0.0
+    #         b = eta_max
+    #         y_i = 0.2 * eta_max
+    #         eta_buf = np.cos(np.pi*np.arange(self.Ny-1,-1,-1)/(self.Ny-1))
+    #         buf1 = y_i * b / (b - 2 * y_i)
+    #         buf2 = 1 + 2 * buf1 / b
+    #         eta = buf1 * (1 + eta_buf) / (buf2 - eta_buf)
+    #     elif self.method == "geometric":
+    #         r = 1.1 # Growth rate
+    #         eta = eta_max * (1 - r**np.arange(self.Ny)) / (1 - r**self.Ny)
+    #     elif self.method == "uniform":
+    #         eta = np.linspace(0, eta_max, self.Ny)
+    #     else:
+    #         raise ValueError("Invalid eta distribution. Choose cheby, cheby2, geometric, or uniform.")
+    #
+    #     X_curv = np.zeros((self.Nx, self.Ny))
+    #     Y_curv = np.zeros((self.Nx, self.Ny))
+    #
+    #     try:
+    #         # Interpolate airfoil coordinates and theta to xi points
+    #         x_surface_interp = interp1d(x1, x_surface, kind='linear', bounds_error=False, fill_value='extrapolate')
+    #         y_surface_interp = interp1d(x1, y_surface, kind='linear', bounds_error=False, fill_value='extrapolate')
+    #         theta_interp = interp1d(x1, theta, kind='linear', bounds_error=False, fill_value='extrapolate')
+    #     except ValueError as e:
+    #         print_rz(f"Interpolation error: {e}")
+    #         print_rz(f"x1 shape: {x1.shape}, x_surface shape: {x_surface.shape},  y_surface shape: {y_surface.shape}, theta shape: {theta.shape}")
+    #         raise
+    #
+    #     self.theta = theta_interp(xi)
+    #     dtheta_dxi = np.gradient(theta_interp(xi), xi, edge_order=2)
+    #     K1 = -1.0 * dtheta_dxi
+    #
+    #     for i, xi_val in enumerate(xi):
+    #         x_s = x_surface_interp(xi_val)
+    #         y_s = y_surface_interp(xi_val)
+    #         theta_s = theta_interp(xi_val)
+    #         
+    #         # Calculate h (first Lamé coefficient)
+    #         h = 1 + eta * K1[i]
+    #         
+    #         # Generate grid points
+    #         X_curv[i, :] = x_s - eta * np.sin(theta_s)
+    #         Y_curv[i, :] = y_s + eta * np.cos(theta_s)
+    #
+    #     self.physicalX = X_curv
+    #     self.physicalY = Y_curv
+    #
+    #     self.xgrid = xi
+    #     self.ygrid = eta
+    #
+    #     self.hx = np.diff(xi)
+    #
+    #     self.xi = xi
+    #     self.eta = eta
+    #
+    #     xi_grid = np.tile(xi[:, np.newaxis], (1, self.Ny))
+    #     eta_grid = np.tile(eta[np.newaxis, :], (self.Nx,1))
+    #
+    #     self.xi_grid = xi_grid
+    #     self.eta_grid = eta_grid
+    #     self.x_grid = self.xi_grid
+    #     self.y_grid = self.eta_grid
+    #
+    #     # input kappa is a 1d vector
+    #     # need to expand it for consistency reasons
+    #     d2theta_dxi2 = np.gradient(dtheta_dxi, xi)
+    #     kappa = K1
+    #     self.kappa = kappa[:, np.newaxis]
+    #
+    #     self.h = 1 + self.kappa * self.eta_grid 
+    #     self.dtheta_dxi = dtheta_dxi[:, np.newaxis]
+    #     self.d2theta_dxi2 = d2theta_dxi2[:, np.newaxis]
+    #
+    # def compute_metrics(self):
+    #     # Calculate metrics of the coordinate transformation
+    #
+    #     # Initialize arrays for metric coefficients
+    #     num_xi  = self.Nx
+    #     num_eta = self.Ny
+    #
+    #     self.x_xi  = np.zeros((num_xi, num_eta))
+    #     self.x_eta = np.zeros((num_xi, num_eta))
+    #     self.y_xi  = np.zeros((num_xi, num_eta))
+    #     self.y_eta = np.zeros((num_xi, num_eta))
+    #
+    #     self.xi_x  = np.zeros((num_xi, num_eta))
+    #     self.xi_y  = np.zeros((num_xi, num_eta))
+    #     self.eta_x = np.zeros((num_xi, num_eta))
+    #     self.eta_y = np.zeros((num_xi, num_eta))
+    #
+    #     for i in range(num_xi):
+    #         h                = self.h[i,:]
+    #
+    #         self.x_xi[i, :]  = h * np.cos(self.theta[i])
+    #         self.x_eta[i, :] = -np.sin(self.theta[i])
+    #         self.y_xi[i, :]  = h * np.sin(self.theta[i])
+    #         self.y_eta[i, :] = np.cos(self.theta[i])
+    #
+    #         self.xi_x[i, :]  = np.cos(self.theta[i]) / h
+    #         self.xi_y[i, :]  = np.sin(self.theta[i]) / h
+    #         self.eta_x[i, :] = -1.0 * np.sin(self.theta[i])
+    #         self.eta_y[i, :] = np.cos(self.theta[i])
+    #
+    #     self.J11 = self.xi_x
+    #     self.J12 = self.xi_y
+    #     self.J21 = self.eta_x
+    #     self.J22 = self.eta_y
+    #
+    #     # Calculate Jacobian
+    #     self.J = self.x_xi * self.y_eta - self.x_eta * self.y_xi
+    #
+    #     # Compute higher order metric terms
+    #
+    #     self.dJ11_dxi = np.gradient(self.J11, self.xi, axis=0, edge_order=2)
+    #     self.dJ11_deta = np.gradient(self.J11, self.eta, axis=1, edge_order=2)
+    #
+    #     self.dJ12_dxi = np.gradient(self.J12, self.xi, axis=0, edge_order=2)
+    #     self.dJ12_deta = np.gradient(self.J12, self.eta, axis=1, edge_order=2)
+    #     
+    #     self.dJ21_dxi = np.gradient(self.J21, self.xi, axis=0, edge_order=2)
+    #     self.dJ21_deta = np.gradient(self.J21, self.eta, axis=1, edge_order=2)
+    #
+    #     self.dJ22_dxi = np.gradient(self.J22, self.xi, axis=0, edge_order=2)
+    #     self.dJ22_deta = np.gradient(self.J22, self.eta, axis=1, edge_order=2)
+    #
+    # def transform_velocities(self):
+    #     """
+    #     This function transform Cartesian velocities into xi and eta aligned velocties. It interpolates onto a reduced grid if necessary. 
+    #     """
+    #     print_rz(f"U Cartesian Shape: {self.u_field.shape}")
+    #     print_rz(f"U Curvilinear Shape: {self.physicalX.shape}")
+    #     if self.u_field.shape != self.physicalX.shape:
+    #         # print_rz(f"These shapes do not match. Interpolation required.")
+    #         points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
+    #         utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #         vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #         ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #     else:
+    #         # print_rz("These shapes match. Interpolation is not required.")
+    #         points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
+    #         utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #         vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #         ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+    #
+    #     self.compute_metrics()
+    #
+    #     U_xi = self.xi_x * utemp + self.xi_y * vtemp
+    #     U_eta = self.eta_x * utemp + self.eta_y * vtemp
+    #
+    #     self.u_grid = U_xi
+    #     self.v_grid = U_eta
+    #     self.p_grid = ptemp
+    #
+    # def normalize_fields(self):
+    #
+    #     # first compute l0 
+    #     # use physical nu 
+    #     nu = 3.75e-06
+    #     rhoinf = 1.225
+    #
+    #     Uinf = np.max(self.u_grid[0,:])
+    #     # Uinf = 15.0 # global Uinf
+    #     l0 = np.sqrt(nu * self.x_field[0,0] / Uinf)
+    #     # try l0 with sqrt(2) in the numerator
+    #     # l0 = np.sqrt(2 * nu * self.x_field[0,0] / Uinf)
+    #     Re = Uinf * l0 / nu
+    #     nu_nondim = 1.0 / Re
+    #     # Nondimensionalizing the flow 
+    #     print_rz(f"Nondimensionalizing the flow field...")
+    #     print_rz(f"l0 = {l0}")
+    #     print_rz(f"U_inf = {Uinf}")
+    #     print_rz(f"X0 = {self.x_field[0,0]}")
+    #     print_rz(f"Re = {Re}")
+    #     print_rz(f"nu nondim = {nu_nondim}")
+    #
+    #     f = 1860 # dimensional frequency in Hz
+    #     omega_nondim = 2 * np.pi * f * Re * nu / Uinf**2
+    #     F = omega_nondim / Re * 1e6
+    #     print_rz(f"omega nondim = {omega_nondim}")
+    #     print_rz(f"F = {F}")
+    #
+    #     self.u_grid /= Uinf
+    #     self.v_grid /= Uinf
+    #     self.p_grid = self.p_grid / (0.5 * rhoinf * Uinf**2)
+    #
+    #     self.xi_grid /= l0 
+    #     self.eta_grid /= l0
+    #     self.xi /= l0 
+    #     self.eta /= l0 
+    #     # uncommenting line below ruins the computation of d99...
+    #     # is it cause ygrid references eta?
+    #     self.xgrid = self.xi
+    #     self.ygrid = self.eta
+    #
+    #     self.dtheta_dxi *= l0
+    #     self.d2theta_dxi2 *= l0**2
+    #     self.hx = np.diff(self.xi)
+    #
+    #     self.dJ11_dxi *= l0
+    #     self.dJ11_deta *= l0
+    #
+    #     self.dJ12_dxi *= l0
+    #     self.dJ12_deta *= l0
+    #     
+    #     self.dJ21_dxi *= l0
+    #     self.dJ21_deta *= l0
+    #
+    #     self.dJ22_dxi *= l0
+    #     self.dJ22_deta *= l0
+    #
+    #
+    # def check_gcl_static_2d(self, tolerance=1e-10):
+    #     """
+    #     Check if the 2D static curvilinear grid satisfies the GCL.
+    #     """
+    #
+    #     J = self.J
+    #     y_eta = self.y_eta
+    #     y_xi = self.y_xi
+    #     x_eta = self.x_eta
+    #     x_xi = self.x_xi
+    #     # Check GCL conditions
+    #
+    #     #TODO:
+    #     # should compute gradient in eta direction using my FD or Chebyshev operators
+    #     gcl_x = np.gradient(J * y_eta, self.xi, axis=0, edge_order=1) - np.gradient(J * y_xi, self.eta, axis=1, edge_order=1)
+    #     gcl_y = -np.gradient(J * x_eta, self.xi, axis=0, edge_order=1) + np.gradient(J * x_xi, self.eta, axis=1, edge_order=1)
+    #
+    #     # gcl_x = np.gradient(J * y_eta, self.xi, axis=0) - self.Dy @ (J * y_xi)
+    #     # gcl_y = -np.gradient(J * x_eta, self.xi, axis=0) + self.Dy @ (J * x_xi)
+    #     
+    #     gcl_satisfied = (np.abs(gcl_x) < tolerance).all() and (np.abs(gcl_y) < tolerance).all()
+    #
+    #     max_error = max(np.abs(gcl_x).max(), np.abs(gcl_y).max())
+    #     mean_error = max(np.abs(gcl_x).mean(), np.abs(gcl_y).mean())
+    #
+    #     if gcl_satisfied:
+    #         print_rz(f"GCL condition satisfied...")
+    #     else:
+    #         print_rz(f"GCL condition is NOT satisfied!")
+    #         print_rz(f"Max GCL error = {max_error}")
+    #         print_rz(f"Mean GCL error = {mean_error}")
+    #
+    #         plt.figure(figsize=(6,3), dpi=200)
+    #         plt.contourf(self.xi_grid, self.eta_grid, np.log10(np.abs(gcl_x)), levels=200, cmap='icefire')
+    #         plt.xlabel(r'$\xi$')
+    #         plt.ylabel(r'$\eta$')
+    #         plt.colorbar()
+    #         plt.title('GCL x')
+    #         plt.tight_layout()
+    #         plt.savefig('gcl_x.png')
+    #
+    #         plt.figure(figsize=(6,3), dpi=200)
+    #         plt.contourf(self.xi_grid, self.eta_grid, np.log10(np.abs(gcl_y)), levels=200, cmap='icefire')
+    #         plt.xlabel(r'$\xi$')
+    #         plt.ylabel(r'$\eta$')
+    #         plt.title('GCL y')
+    #         plt.colorbar()
+    #         plt.tight_layout()
+    #         plt.savefig('gcl_y.png')
+    #     
+    #     return gcl_satisfied, max_error
     
 class gortlerGrid:
     def __init__(self, x_surface, y_surface, hx , x0, eta_max, N_eta, kappa, method="cheby", need_map=True, Uinf=1.0, nu=1.0):

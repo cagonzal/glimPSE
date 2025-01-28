@@ -55,36 +55,62 @@ class NLPSE():
 
         self.station = None # every x station in the PSE to solve
 
+        # Grid information
         self.Grid      = Grid
 
-        self.xgrid     = Grid.xgrid
-        self.ygrid     = Grid.ygrid
-        self.Nx        = Grid.Nx
-        self.Ny        = Grid.Ny
+        # store grid information at different locations 
+        # cell centers (pressure points)
+
+        self.xgrid_c = Grid.xi_grid_c
+        self.ygrid_c = Grid.eta_grid_c
+        # U-velocity points
+        self.xgrid_u = Grid.xi_grid_u
+        self.ygrid_u = Grid.eta_grid_u
+        # V-velocity points
+        self.xgrid_v = Grid.xi_grid_v
+        self.ygrid_v = Grid.eta_grid_v
+
+        # Grid dimensions
+        self.Nx = Grid.Nx
+        self.Ny = Grid.Ny
 
         # Flow params
         self.config    = config
+
         # Base flow
         self.Baseflow  = Baseflow
 
-        self.U         = np.zeros((self.Ny, self.Nx))
-        self.Uy        = np.zeros((self.Ny, self.Nx))
-        self.Ux        = np.zeros((self.Ny, self.Nx))
-        self.V         = np.zeros((self.Ny, self.Nx))
-        self.Vy        = np.zeros((self.Ny, self.Nx))
-        self.Vx        = np.zeros((self.Ny, self.Nx))
-        self.W         = np.zeros((self.Ny, self.Nx))
-        self.Wy        = np.zeros((self.Ny, self.Nx))
-        self.Wx        = np.zeros((self.Ny, self.Nx))
-        self.P         = np.zeros((self.Ny, self.Nx))
+        # Initialize flow fields at proper staggered locations
+        # U and its derivatives at u-points
+        self.U = np.zeros((self.Ny, self.Nx-1))    # Staggered in x
+        self.Uy = np.zeros((self.Ny, self.Nx-1))   # At u-points
+        self.Ux = np.zeros((self.Ny, self.Nx))     # At p-points
+        
+        # V and its derivatives at v-points
+        self.V = np.zeros((self.Ny-1, self.Nx))    # Staggered in y
+        self.Vy = np.zeros((self.Ny, self.Nx))     # At p-points
+        self.Vx = np.zeros((self.Ny-1, self.Nx))   # At v-points
+        
+        # W and its derivatives (if needed)
+        self.W = np.zeros((self.Ny, self.Nx))      # At p-points
+        self.Wy = np.zeros((self.Ny, self.Nx))
+        self.Wx = np.zeros((self.Ny, self.Nx))
 
-        self.U_nlt0    = np.zeros((self.Ny, self.Nx))
-        self.V_nlt0    = np.zeros((self.Ny, self.Nx))
-        self.P_nlt0    = np.zeros((self.Ny, self.Nx))
+        # Pressure at cell centers
+        self.P = np.zeros((self.Ny, self.Nx))
+        
+        # Nonlinear terms (stored at their respective staggered locations)
+        self.U_nlt0 = np.zeros((self.Ny, self.Nx-1))   # At u-points
+        self.V_nlt0 = np.zeros((self.Ny-1, self.Nx))   # At v-points
+        self.P_nlt0 = np.zeros((self.Ny, self.Nx))     # At p-points
 
-        # Differentiation
-        self.Dy        = Grid.Dy
-        self.Dyy       = Grid.Dyy
+        # Differentiation operators for different grid locations
+        self.Dy_c = Grid.Dy_c    # For cell centers
+        self.Dyy_c = Grid.Dyy_c
+        self.Dy_u = Grid.Dy_u    # For u-velocity points
+        self.Dyy_u = Grid.Dyy_u
+        self.Dy_v = Grid.Dy_v    # For v-velocity points
+        self.Dyy_v = Grid.Dyy_v
 
         # self.hx = np.zeros(self.Nx)
         self.hx = Grid.hx
@@ -114,27 +140,64 @@ class NLPSE():
         # helper mats
         self.helper_mats = None
 
-        # mesh transformation stuff
-        # these are the inverse metrics
-        self.J11 = Grid.J11
-        self.J12 = Grid.J12
-        self.J21 = Grid.J21
-        self.J22 = Grid.J22
-
-        self.dJ11_dx = Grid.dJ11_dxi
-        # cross terms are equal
-        self.dJ12_dxi = Grid.dJ12_dxi
-        self.dJ11_deta = Grid.dJ11_deta
-        self.dJ12_deta = Grid.dJ12_deta
-
-        self.dJ21_dxi = Grid.dJ21_dxi
-        self.dJ22_dxi = Grid.dJ22_dxi
-        self.dJ21_deta = Grid.dJ21_deta
-        self.dJ22_deta = Grid.dJ22_deta
-
-        self.h = Grid.h
-        self.kappa = Grid.kappa
+        # Mesh transformation metrics at different locations
+        # Cell centers (p-points)
+        self.J11_c = Grid.J11_c
+        self.J12_c = Grid.J12_c
+        self.J21_c = Grid.J21_c
+        self.J22_c = Grid.J22_c
         
+        # U-velocity points
+        self.J11_u = Grid.J11_u
+        self.J12_u = Grid.J12_u
+        self.J21_u = Grid.J21_u
+        self.J22_u = Grid.J22_u
+        
+        # V-velocity points
+        self.J11_v = Grid.J11_v
+        self.J12_v = Grid.J12_v
+        self.J21_v = Grid.J21_v
+        self.J22_v = Grid.J22_v
+
+        # Metric derivatives at respective locations
+        self.dJ11_dxi_c = Grid.dJ11_dxi_c
+        self.dJ12_dxi_c = Grid.dJ12_dxi_c
+        self.dJ21_dxi_c = Grid.dJ21_dxi_c
+        self.dJ22_dxi_c = Grid.dJ22_dxi_c
+        
+        self.dJ11_deta_c = Grid.dJ11_deta_c
+        self.dJ12_deta_c = Grid.dJ12_deta_c
+        self.dJ21_deta_c = Grid.dJ21_deta_c
+        self.dJ22_deta_c = Grid.dJ22_deta_c
+        
+        # Store h and kappa at different locations
+        self.h_c = Grid.h_c
+        self.h_u = Grid.h_u
+        self.h_v = Grid.h_v
+
+        self.kappa_c = Grid.kappa_c
+        self.kappa_u = Grid.kappa_u
+        self.kappa_v = Grid.kappa_v
+
+    def interpolate_to_centers(self, staggered_field, direction):
+        """
+        Helper method to interpolate staggered fields to cell centers when needed.
+        """
+        if direction == 'u':
+            centered = np.zeros((self.Ny, self.Nx))
+            centered[:, 1:-1] = 0.5 * (staggered_field[:, 1:] + staggered_field[:, :-1])
+            # Extrapolate boundaries
+            centered[:, 0] = 2*centered[:, 1] - centered[:, 2]
+            centered[:, -1] = 2*centered[:, -2] - centered[:, -3]
+            return centered
+        elif direction == 'v':
+            centered = np.zeros((self.Ny, self.Nx))
+            centered[1:-1, :] = 0.5 * (staggered_field[1:, :] + staggered_field[:-1, :])
+            # Extrapolate boundaries
+            centered[0, :] = 2*centered[1, :] - centered[2, :]
+            centered[-1, :] = 2*centered[-2, :] - centered[-3, :]
+            return centered
+
     def sampleGrid(self,Grid):
 
         """
@@ -144,30 +207,57 @@ class NLPSE():
             Grid (Grid): Grid object containing mesh information.
         """
 
-        self.xgrid     = Grid.xgrid
-        self.ygrid     = Grid.ygrid
-        self.Nx        = Grid.Nx
-        self.Ny        = Grid.Ny
+        self.xgrid_c = Grid.xi_grid_c
+        self.ygrid_c = Grid.eta_grid_c
+        # U-velocity points
+        self.xgrid_u = Grid.xi_grid_u
+        self.ygrid_u = Grid.eta_grid_u
+        # V-velocity points
+        self.xgrid_v = Grid.xi_grid_v
+        self.ygrid_v = Grid.eta_grid_v
 
-        # mesh transformation stuff
-        self.J11 = Grid.J11
-        self.J12 = Grid.J12
-        self.J21 = Grid.J21
-        self.J22 = Grid.J22
+        # Grid dimensions
+        self.Nx = Grid.Nx
+        self.Ny = Grid.Ny
 
-        self.dJ11_dx = Grid.dJ11_dxi
-        # cross terms are equal
-        self.dJ12_dxi = Grid.dJ12_dxi
-        self.dJ11_deta = Grid.dJ11_deta
-        self.dJ12_deta = Grid.dJ12_deta
+        # Mesh transformation metrics at different locations
+        # Cell centers (p-points)
+        self.J11_c = Grid.J11_c
+        self.J12_c = Grid.J12_c
+        self.J21_c = Grid.J21_c
+        self.J22_c = Grid.J22_c
+        
+        # U-velocity points
+        self.J11_u = Grid.J11_u
+        self.J12_u = Grid.J12_u
+        self.J21_u = Grid.J21_u
+        self.J22_u = Grid.J22_u
+        
+        # V-velocity points
+        self.J11_v = Grid.J11_v
+        self.J12_v = Grid.J12_v
+        self.J21_v = Grid.J21_v
+        self.J22_v = Grid.J22_v
 
-        self.dJ21_dxi = Grid.dJ21_dxi
-        self.dJ22_dxi = Grid.dJ22_dxi
-        self.dJ21_deta = Grid.dJ21_deta
-        self.dJ22_deta = Grid.dJ22_deta
+        # Metric derivatives at respective locations
+        self.dJ11_dxi_c = Grid.dJ11_dxi_c
+        self.dJ12_dxi_c = Grid.dJ12_dxi_c
+        self.dJ21_dxi_c = Grid.dJ21_dxi_c
+        self.dJ22_dxi_c = Grid.dJ22_dxi_c
+        
+        self.dJ11_deta_c = Grid.dJ11_deta_c
+        self.dJ12_deta_c = Grid.dJ12_deta_c
+        self.dJ21_deta_c = Grid.dJ21_deta_c
+        self.dJ22_deta_c = Grid.dJ22_deta_c
+        
+        # Store h and kappa at different locations
+        self.h_c = Grid.h_c
+        self.h_u = Grid.h_u
+        self.h_v = Grid.h_v
 
-        self.h = Grid.h
-        self.kappa = Grid.kappa
+        self.kappa_c = Grid.kappa_c
+        self.kappa_u = Grid.kappa_u
+        self.kappa_v = Grid.kappa_v
 
     def viableHarmonics(self, init_modes, mode_to_remove=None, num_repeats=3):
         """

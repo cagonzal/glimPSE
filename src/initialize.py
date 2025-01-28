@@ -153,7 +153,8 @@ def initialize_curved_surface(config):
 
     # Initialize baseflow using interpolated data
     Baseflow = bf.Baseflow(Grid)
-    Baseflow.set_velocity_field(Grid.xi_grid, Grid.eta_grid, Grid.u_grid, Grid.v_grid, Grid.p_grid)
+    # Baseflow.set_velocity_field(Grid.xi_grid, Grid.eta_grid, Grid.u_grid, Grid.v_grid, Grid.p_grid)
+    Baseflow.set_velocity_field_staggered(Grid.xi_grid_c, Grid.eta_grid_c,Grid.xi_grid_u, Grid.eta_grid_u,Grid.xi_grid_v, Grid.eta_grid_v,Grid.u_stag, Grid.v_stag, Grid.p_stag)
     print_rz(f"Curved surface baseflow initialized\n")
 
     # Initialize equation instance

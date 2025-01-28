@@ -626,6 +626,15 @@ class NLPSE():
         Re = self.config['flow']['Re']
         hx = self.hx[station]
 
+        # u du/dx + v du/dy + dp/dx - 1/Re d2/dy2 U = NLT
+        # u dv/dx + v dv/dy + dp/dy - 1/Re d2/dy2 V = NLT
+        # du/dx + dv/dy = 0 
+
+        # u^(k+1) (u^k+1 - u^k)/dx + v^(k+1) Dy u^(k+1) - 1/Re d2/dy2 u^(k+1) = 0
+        # u^(k+1) (v^k+1 - v^k)/dx + v^k+1 Dy v^(k+1) - 1/Re Dyy v^(k+1) = 0
+        # pressure correction...
+
+
         one_over_h = 1 / self.h[station, :]
         kappa = self.kappa[station, 0]
 

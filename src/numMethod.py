@@ -25,14 +25,6 @@ class derivativeOperators:
             self.Dy = self.set_D_FD(self.ygrid,d=1,order=2, output_full=True, uniform=False)
             self.Dyy = self.set_D_FD(self.ygrid,d=2,order=2, output_full=True, uniform=False)
 
-            pressure_ygrid = 0.5 * (self.ygrid[:-1] + self.ygrid[1:])
-            self.Dyp = self.set_D_FD(pressure_ygrid, d=1,order=2,output_full=True,uniform=False)
-
-            # self.Dyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=True,order=2,d=1,reduce_wall_order=True,output_full=True,periodic=False,uniform=False)
-            # self.Dyyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=False,order=2,d=2,reduce_wall_order=True,output_full=False,periodic=False,uniform=False)
-
-            print_rz(f"Dy shape = {self.Dy.shape}")
-
         else:
             raise ValueError("Invalid method chosen for derivatives")
 
@@ -926,12 +918,6 @@ class surfaceImport:
         u_cart = self.interpolate_to_u_points(self.u_field)
         v_cart = self.interpolate_to_v_points(self.v_field)
 
-        print(f"u_field = {self.u_field}")
-        print(f"v_field = {self.v_field}")
-
-        print(f"u_cart = {u_cart}")
-        print(f"v_cart = {v_cart}")
-        
         # Transform velocities using metrics at appropriate locations
         self.u_stag = (getattr(self, 'xi_x_u') * u_cart + 
                       getattr(self, 'xi_y_u') * self.interpolate_v_to_u(v_cart))

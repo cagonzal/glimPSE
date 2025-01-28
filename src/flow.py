@@ -314,4 +314,86 @@ class Baseflow:
         self.Wy = np.zeros_like(self.W)
         self.Wxy = np.zeros_like(self.W)
 
+    def set_velocity_field_staggered(self, xi_grid_c, eta_grid_c, xi_grid_u, eta_grid_u, xi_grid_v, eta_grid_v, u_grid_stag, v_grid_stag, p_grid_stag):
 
+        """Set velocity field and compute derivatives on staggered grid."""
+
+        # Store grids and fields
+        self.xi_grid_c = xi_grid_c
+        self.eta_grid_c = eta_grid_c
+        self.xi_grid_u = xi_grid_u
+        self.eta_grid_u = eta_grid_u
+        self.xi_grid_v = xi_grid_v
+        self.eta_grid_v = eta_grid_v
+
+        self.u_grid = u_grid_stag
+        self.v_grid = v_grid_stag
+        self.p_grid = p_grid_stag
+
+        # Get 1D coordinate arrays
+        xi_c = xi_grid_c[:, 0]   # Cell centers xi
+        xi_u = xi_grid_u[:, 0]   # U-velocity xi
+        xi_v = xi_grid_v[:, 0]   # V-velocity xi
+
+        eta_c = eta_grid_c[0, :] # Cell centers eta
+        eta_u = eta_grid_u[0, :] # U-velocity eta
+        eta_v = eta_grid_v[0, :] # V-velocity eta
+
+        # Compute U derivatives
+        # ---------------------
+        # Ux is naturally staggered at p-points
+        self.Ux = np.zeros_like(self.xi_grid_c)
+        for j in range(eta_grid_c.shape[1]):
+            self.Ux[1:-1, j] = (u_grid_stag[1:, j] - u_grid_stag[:-1, j]) / \
+                (xi_u[1:] - xi_u[:-1])
+
+        # Uy needs special treatment since u is at u-points
+        self.Uy = np.zeros_like(u_grid_stag)
+        for i in range(u_grid_stag.shape[0]):
+            self.Uy[i, :] = np.gradient(u_grid_stag[i, :], eta_u)
+
+        # Uyy at u-points
+        self.Uyy = np.zeros_like(u_grid_stag)
+        for i in range(u_grid_stag.shape[0]):
+            self.Uyy[i, :] = np.gradient(self.Uy[i, :], eta_u)
+
+        # Compute V derivatives
+        # ---------------------
+        # Vx needs special treatment since v is at v-points
+        self.Vx = np.zeros_like(v_grid_stag)
+        for j in range(v_grid_stag.shape[1]):
+            self.Vx[:, j] = np.gradient(v_grid_stag[:, j], xi_v)
+
+        # Vy is naturally staggered at p-points
+        self.Vy = np.zeros_like(self.xi_grid_c)
+        for i in range(xi_grid_c.shape[0]):
+            self.Vy[i, 1:-1] = (v_grid_stag[i, 1:] - v_grid_stag[i, :-1]) / \
+                (eta_v[1:] - eta_v[:-1])
+
+        # Keep W-related terms if needed
+        if hasattr(self, 'W'):
+            self.Wx = np.zeros_like(self.W)
+            self.Wy = np.zeros_like(self.W)
+            self.Wxy = np.zeros_like(self.W)
+
+    def interpolate_to_centers(self, staggered_field, direction):
+        """
+        Interpolate staggered field to cell centers.
+        
+        Parameters:
+            staggered_field: Field at staggered locations
+            direction: 'u' for u-velocity, 'v' for v-velocity
+        """
+        if direction == 'u':
+            centered = np.zeros((self.xi_grid_c.shape[0], staggered_field.shape[1]))
+            centered[1:-1, :] = 0.5 * (staggered_field[1:, :] + staggered_field[:-1, :])
+            # Extrapolate to boundaries
+            centered[0, :] = 2*centered[1, :] - centered[2, :]
+            centered[-1, :] = 2*centered[-2, :] - centered[-3, :]
+        else:  # v-velocity
+            centered = np.zeros((staggered_field.shape[0], self.eta_grid_c.shape[1]))
+            centered[:, 1:-1] = 0.5 * (staggered_field[:, 1:] + staggered_field[:, :-1])
+            # Extrapolate to boundaries
+            centered[:, 0] = 2*centered[:, 1] - centered[:, 2]
+            centered[:, -1] = 2*centered[:, -2] - centered[:, -3]
+        return centered

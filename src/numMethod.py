@@ -597,16 +597,6 @@ class surfaceImport:
         self.J_u = None # jacobian at u-vel points
         self.J_v = None # jacobian at v-vel points
         
-        # self.xi_grid = None
-        # self.hx = None
-        # self.eta_grid = None
-        # self.xgrid = None
-        # self.ygrid = None
-        # self.u_grid = None
-        # self.v_grid = None
-        # self.p_grid = None
-        # self.kappa = None
-
         self.Uinf = Uinf
         self.nu = nu
 
@@ -617,10 +607,6 @@ class surfaceImport:
 
         # create derivative operators for different grid locations
         self.setup_derivative_operators()
-
-        # derivativeOps = derivativeOperators(self.ygrid, self.method)
-        # self.Dy = derivativeOps.Dy
-        # self.Dyy = derivativeOps.Dyy
 
         # self.check_gcl_static_2d()
 

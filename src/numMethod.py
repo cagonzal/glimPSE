@@ -914,6 +914,11 @@ class surfaceImport:
         # Interpolate pressure to cell centers
         self.p_stag = self.interpolate_to_cell_centers(self.p_field)
 
+
+        print_rz(f"u_stag shape = {self.u_stag.shape}")
+        print_rz(f"v_stag shape = {self.v_stag.shape}")
+        print_rz(f"p_stag shape = {self.p_stag.shape}")
+
     def setup_derivative_operators(self):
         """Create derivative operators for different grid locations."""
         # Create operators for cell centers

@@ -611,6 +611,117 @@ class NLPSE():
 
         return Fmn
 
+    def solveMeanFlowBlock(self, Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station):
+        """
+        Solves the mean flow equations using a block matrix approach.
+        U dV/dx + VdV/dy + dp/dy - 1/Re d²V/dy² = 0
+        U dU/dx + VdU/dy + dp/dx - 1/Re d²U/dy² = 0
+        dU/dx + dV/dy = 0
+
+        Parameters:
+            Dy, Dyy (array-like): Derivative matrices
+            Uk, Vk, Pk (array-like): Known state variables at k
+            fkp1, fk (array-like): Forcing terms at k+1 and k
+            station (int): Station index
+        """
+        ny = self.Ny
+        Re = self.config['flow']['Re']
+        hx = self.hx[station]
+        N = 3*ny  # Total system size
+        
+        # Initialize block matrix and RHS
+        A = np.zeros((N, N))
+        b = np.zeros(N)
+        
+        # Common operators
+        H = -np.diag(Vk) @ Dy + 1.0/Re * Dyy
+        
+        # U-momentum blocks (First ny rows)
+        A[0:ny, 0:ny] = np.diag(Uk)/hx - 0.5*H  # Coefficient of U_{k+1}
+        A[0:ny, 2*ny:3*ny] = np.eye(ny)/hx      # dp/dx term
+        b[0:ny] = (np.diag(Uk)/hx + 0.5*H) @ Uk + 0.5*(fkp1[0:ny] + fk[0:ny])
+        
+        # V-momentum blocks (Second ny rows)
+        A[ny:2*ny, ny:2*ny] = np.diag(Uk)/hx - 0.5*H  # Coefficient of V_{k+1}
+        A[ny:2*ny, 2*ny:3*ny] = Dy                     # dp/dy term
+        b[ny:2*ny] = (np.diag(Uk)/hx + 0.5*H) @ Vk + 0.5*(fkp1[ny:2*ny] + fk[ny:2*ny])
+        
+        # Continuity blocks (Third ny rows)
+        A[2*ny:3*ny, 0:ny] = np.eye(ny)/hx     # dU/dx term
+        A[2*ny:3*ny, ny:2*ny] = Dy             # dV/dy term
+        b[2*ny:3*ny] = Uk/hx
+        
+        # U boundary conditions
+        # U = 0 at wall
+        row = 0
+        A[row, :] = 0
+        A[row, row] = 1
+        b[row] = 0
+        
+        # U = Uinf at infinity
+        row = ny-1
+        A[row, :] = 0
+        A[row, row] = 1
+        if self.config['geometry']['type'] == "import_geom":
+            b[row] = self.Baseflow.U[station, -1]
+        else:
+            b[row] = self.config['flow']["Uinf"]
+        
+        # V boundary conditions
+        # V = 0 at wall
+        row = ny
+        A[row, :] = 0
+        A[row, ny] = 1
+        b[row] = 0
+        
+        # V = 0 at infinity (changed from dV/dy = 0)
+        row = 2*ny-1
+        A[row, :] = 0
+        A[row, 2*ny-1] = 1
+        if self.config['geometry']['type'] == 'import_geom':
+            b[row] = self.Baseflow.V[station, -1]
+        else:
+            b[row] = 0
+        
+        # Pressure boundary conditions
+        # p = 0 at wall
+        row = 2*ny
+        A[row, :] = 0
+        A[row, 2*ny] = 1
+        b[row] = 0
+        
+        # dp/dy = 0 at infinity
+        row = 3*ny-1
+        A[row, :] = 0
+        for j in range(ny):
+            A[row, 2*ny+j] = Dy[-1, j]
+        b[row] = 0
+        
+        # Add small regularization to pressure diagonal to improve conditioning
+        eps = 1e-10
+        for i in range(2*ny, 3*ny):
+            A[i,i] += eps
+        
+        # Debug: Check matrix conditioning
+        cond = np.linalg.cond(A)
+        if cond > 1e15:  # Warning threshold
+            print(f"Warning: Matrix condition number is high: {cond}")
+            
+        try:
+            sol = sp.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            print("Linear solver failed. Attempting with pseudo-inverse...")
+            sol = np.linalg.lstsq(A, b, rcond=None)[0]
+        
+        # Extract solutions
+        Ubar = sol[0:ny]
+        Vbar = sol[ny:2*ny]
+        Pbar = sol[2*ny:3*ny]
+        Wbar = np.zeros_like(Ubar)
+        
+        return Ubar, Vbar, Pbar, Wbar
+
+    
     def solveMeanFlow(self, Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station):
         """
         Solves the mean flow equations.
@@ -827,7 +938,7 @@ class NLPSE():
             fkp1 = np.real(self.Fmn[station, 0, 0, :]) * 0 
             fk = np.real(self.Fmn[station - 1, 0, 0, :]) * 0 
 
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
             self.U[:, station] = np.copy(Ubar)
             self.V[:, station] = np.copy(Vbar)
             self.P[:, station] = np.copy(Pbar)
@@ -855,9 +966,9 @@ class NLPSE():
                 print_rz(f"Error in computing F_00\n")
                 print_rz(f"imag error = {imag_error}\n")
 
-            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), \
+            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), \
                 self.U_nlt0[:, station-1], self.V_nlt0[:, station-1], self.P_nlt0[:, station-1], fkp1 * 0, fk * 0, station)
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
 
             MFD_U = Ubar - self.U_nlt0[:, station]
             MFD_V = Vbar - self.V_nlt0[:, station]

@@ -938,7 +938,7 @@ class NLPSE():
             fkp1 = np.real(self.Fmn[station, 0, 0, :]) * 0 
             fk = np.real(self.Fmn[station - 1, 0, 0, :]) * 0 
 
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
             self.U[:, station] = np.copy(Ubar)
             self.V[:, station] = np.copy(Vbar)
             self.P[:, station] = np.copy(Pbar)
@@ -966,9 +966,9 @@ class NLPSE():
                 print_rz(f"Error in computing F_00\n")
                 print_rz(f"imag error = {imag_error}\n")
 
-            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), \
+            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), \
                 self.U_nlt0[:, station-1], self.V_nlt0[:, station-1], self.P_nlt0[:, station-1], fkp1 * 0, fk * 0, station)
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
 
             MFD_U = Ubar - self.U_nlt0[:, station]
             MFD_V = Vbar - self.V_nlt0[:, station]

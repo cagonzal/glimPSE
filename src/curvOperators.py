@@ -557,14 +557,17 @@ class NLPSE():
         # 2/1/24 commented out w lines because there is no W baseflow, therefore 
         # w(0,0) contributionshould be included 
 
-        # uhat_mn[self.numM-1, self.numN-1, :] = 0
-        # vhat_mn[self.numM-1, self.numN-1, :] = 0
+        uhat_mn[self.numM-1, self.numN-1, :] = 0
+        vhat_mn[self.numM-1, self.numN-1, :] = 0
+        what_mn[self.numM-1, self.numN-1, :] = 0
 
-        # uhatx_mn[self.numM-1, self.numN-1, :] = 0
-        # vhatx_mn[self.numM-1, self.numN-1, :] = 0
+        uhatx_mn[self.numM-1, self.numN-1, :] = 0
+        vhatx_mn[self.numM-1, self.numN-1, :] = 0
+        whatx_mn[self.numM-1, self.numN-1, :] = 0
 
-        # uhaty_mn[self.numM-1, self.numN-1, :] = 0
-        # vhaty_mn[self.numM-1, self.numN-1, :] = 0
+        uhaty_mn[self.numM-1, self.numN-1, :] = 0
+        vhaty_mn[self.numM-1, self.numN-1, :] = 0
+        whaty_mn[self.numM-1, self.numN-1, :] = 0
 
         alpha_mn[self.numM-1, self.numN-1, :] = 0
         Ialpha_mn[self.numM-1, self.numN-1, :] = 1.0
@@ -939,7 +942,7 @@ class NLPSE():
             fkp1 = np.real(self.Fmn[station, 0, 0, :]) * 0 
             fk = np.real(self.Fmn[station - 1, 0, 0, :]) * 0 
 
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(Dy, Dyy, Uk, Vk, Pk, fkp1, fk, station)
             self.U[:, station] = np.copy(Ubar)
             self.V[:, station] = np.copy(Vbar)
             self.P[:, station] = np.copy(Pbar)
@@ -967,9 +970,9 @@ class NLPSE():
                 print_rz(f"Error in computing F_00\n")
                 print_rz(f"imag error = {imag_error}\n")
 
-            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), \
+            self.U_nlt0[:, station], self.V_nlt0[:, station], self.P_nlt0[:, station], W_nlt0 = self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), \
                 self.U_nlt0[:, station-1], self.V_nlt0[:, station-1], self.P_nlt0[:, station-1], fkp1 * 0, fk * 0, station)
-            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlowBlock(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
+            Ubar, Vbar, Pbar, Wbar= self.solveMeanFlow(np.copy(Dy), np.copy(Dyy), Uk, Vk, Pk, fkp1, fk, station)
 
             MFD_U = Ubar - self.U_nlt0[:, station]
             MFD_V = Vbar - self.V_nlt0[:, station]
@@ -1340,22 +1343,29 @@ class NLPSE():
         
         # Freestream boundary conditions
         # Clear existing conditions first
-        self.A_solve[(1*ny-1,2*ny-1,3*ny-1),:] = 0.
+        self.A_solve[(1*ny-1,3*ny-1),:] = 0.
         
         # Set Dirichlet for u,w at freestream
-        self.A_solve[1*ny-1,(1*ny-1)] = 1.0  # u
-        self.A_solve[3*ny-1,(3*ny-1)] = 1.0  # w
+        self.A_solve[1*ny-1,1*ny-1] = 1.0  # u
+        self.A_solve[3*ny-1,3*ny-1] = 1.0  # w
         
+        
+        # Set corresponding boundary values for u,w
+        self.b[[1*ny-1,3*ny-1]] = 0.0
+
+        # clear existing condition for v
+        # self.A_solve[2*ny-1,:] = 0
+
         # Set Neumann for v at freestream: dv/dy = 0
-        self.A_solve[2*ny-1,ny:2*ny] = self.Dy[ny-1,:]  # Use last row of Dy matrix
-        
-        # Set corresponding boundary values
-        self.b[[1*ny-1,2*ny-1,3*ny-1]] = 0.0
+        # self.A_solve[2*ny-1,ny:2*ny] = self.Dy[ny-1,:]  # Use last row of Dy matrix
+
+        # set for v
+        # self.b[[2*ny-1]] = 0.0
 
         # let's try a pressure bc 
-        self.A_solve[(3*ny-0),:] = 0.
-        self.A_solve[3*ny-0, 3*ny-0] = 1.0
-        self.b[[3*ny-0]] = 0.0
+        # self.A_solve[(3*ny-0),:] = 0.
+        # self.A_solve[3*ny-0, 3*ny-0] = 1.0
+        # self.b[[3*ny-0]] = 0.0
 
     @staticmethod
     @njit
@@ -1580,6 +1590,12 @@ class NLPSE():
                     # if doing so, use the externally generated mean flow 
                     print_rz(f"x for blasius = {self.xgrid[station]}")
                     self.Baseflow.Blasius(self.ygrid, x=self.xgrid[station], Uinf = self.config['flow']['Uinf'], nu = self.config['flow']['nu'])
+                    self.U[:,station] = self.Baseflow.U[0,:]
+                    self.Uy[:,station] = self.Baseflow.Uy[0,:]
+                    self.Ux[:,station] = self.Baseflow.Ux[0,:]
+                    self.V[:,station] = self.Baseflow.V[0,:]
+                    self.Vy[:,station] = self.Baseflow.Vy[0,:]
+                    self.Vx[:,station] = self.Baseflow.Vx[0,:]
 
                     self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer)
                     # if not linear, add the NLT forcing to the RHS
@@ -1588,16 +1604,28 @@ class NLPSE():
 
                     self.setBCsMFD(mode[0], mode[1])
                     q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
-                    print_rz(f"MFD_u = {q_local[0:self.Ny]}")
-                    print_rz(f"MFD_v = {q_local[self.Ny:2*self.Ny]}")
-                    print_rz(f"MFD_w = {q_local[2*self.Ny:3*self.Ny]}")
-                    print_rz(f"MFD_p = {q_local[3*self.Ny:4*self.Ny]}")
+                    umfd = self.helper_mats['u_from_SPE'] @ q_local
+                    vmfd = self.helper_mats['v_from_SPE'] @ q_local
 
-                    if iteration == 1 and station == 1:
-                        plt.figure(figsize=(6,3),dpi=200)
-                        plt.plot(q_local[0:self.Ny], self.ygrid)
-                        plt.tight_layout()
-                        plt.savefig('mfd_u.png')
+                    umfd_dy = self.Dy @ umfd
+                    vmfd_dy = self.Dy @ vmfd
+
+                    qm1 = np.real(self.q[station -1, 0, 0, :])
+                    umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
+                    vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
+                    
+                    umfd_dx = (umfd - umfd_m1) / self.hx[station]
+                    vmfd_dx = (vmfd - vmfd_m1) / self.hx[station]
+
+                    self.U[:,station] += umfd
+                    self.V[:,station] += vmfd
+
+                    self.Uy[:,station] += umfd_dy
+                    self.Vy[:,station] += vmfd_dy
+
+                    self.Ux[:,station] += umfd_dx
+                    self.Vx[:,station] += vmfd_dx
+
                     
                 self.comm.Barrier()
                 self._broadcast_flow_variables(station)

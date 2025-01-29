@@ -509,6 +509,10 @@ class NLPSE():
                 q = np.copy(self.q[station, mCount-mm, nCount-nn, :])
                 qm1 = np.copy(self.q[station - 1, mCount-mm, nCount-nn, :])
 
+                # if mCount == mm and nCount == nn:
+                #     print_rz(f"qMFD in nlt convolution = ")
+                #     print_rz(f"{self.q[station, 0, 0, :]}")
+
                 alpha_mn[mm, nn, :]    = self.alpha[station, mCount-mm, nCount-nn] 
                 Ialpha_mn[mm, nn, :]   = np.exp(1.0j * trapz(self.alpha[0:station+1, mCount-mm, nCount-nn], self.xgrid[0:station+1] - self.xgrid[0]))
                 beta_mn[mm, nn, :]     = self.config['disturbance']['beta']* (nCount - nn)
@@ -553,17 +557,14 @@ class NLPSE():
         # 2/1/24 commented out w lines because there is no W baseflow, therefore 
         # w(0,0) contributionshould be included 
 
-        uhat_mn[self.numM-1, self.numN-1, :] = 0
-        vhat_mn[self.numM-1, self.numN-1, :] = 0
-        # what_mn[self.numM-1, self.numN-1, :] = 0
+        # uhat_mn[self.numM-1, self.numN-1, :] = 0
+        # vhat_mn[self.numM-1, self.numN-1, :] = 0
 
-        uhatx_mn[self.numM-1, self.numN-1, :] = 0
-        vhatx_mn[self.numM-1, self.numN-1, :] = 0
-        # whatx_mn[self.numM-1, self.numN-1, :] = 0
+        # uhatx_mn[self.numM-1, self.numN-1, :] = 0
+        # vhatx_mn[self.numM-1, self.numN-1, :] = 0
 
-        uhaty_mn[self.numM-1, self.numN-1, :] = 0
-        vhaty_mn[self.numM-1, self.numN-1, :] = 0
-        # whaty_mn[self.numM-1, self.numN-1, :] = 0
+        # uhaty_mn[self.numM-1, self.numN-1, :] = 0
+        # vhaty_mn[self.numM-1, self.numN-1, :] = 0
 
         alpha_mn[self.numM-1, self.numN-1, :] = 0
         Ialpha_mn[self.numM-1, self.numN-1, :] = 1.0
@@ -1323,6 +1324,39 @@ class NLPSE():
             self.L[(0*ny-0,1*ny-0,2*ny-0),(0*ny-0,1*ny-0,2*ny-0)] = 500*1.0j
             self.L[(1*ny-1,2*ny-1,3*ny-1),(1*ny-1,2*ny-1,3*ny-1)] = 500*1.0j
 
+    def setBCsMFD(self, m, n, setup_eigs=False):
+        """
+        Sets mixed boundary conditions:
+        - Dirichlet at wall for u,v,w,p
+        - Dirichlet at freestream for u,w,p
+        - Neumann at freestream for v
+        """
+        ny = self.Ny
+        
+        # Wall boundary conditions (unchanged)
+        self.A_solve[(0*ny-0,1*ny-0,2*ny-0),:] = 0.
+        self.A_solve[(0*ny-0,1*ny-0,2*ny-0),(0*ny-0,1*ny-0,2*ny-0)] = 1.0
+        self.b[[0*ny-0,1*ny-0,2*ny-0]] = 0.0
+        
+        # Freestream boundary conditions
+        # Clear existing conditions first
+        self.A_solve[(1*ny-1,2*ny-1,3*ny-1),:] = 0.
+        
+        # Set Dirichlet for u,w at freestream
+        self.A_solve[1*ny-1,(1*ny-1)] = 1.0  # u
+        self.A_solve[3*ny-1,(3*ny-1)] = 1.0  # w
+        
+        # Set Neumann for v at freestream: dv/dy = 0
+        self.A_solve[2*ny-1,ny:2*ny] = self.Dy[ny-1,:]  # Use last row of Dy matrix
+        
+        # Set corresponding boundary values
+        self.b[[1*ny-1,2*ny-1,3*ny-1]] = 0.0
+
+        # let's try a pressure bc 
+        self.A_solve[(3*ny-0),:] = 0.
+        self.A_solve[3*ny-0, 3*ny-0] = 1.0
+        self.b[[3*ny-0]] = 0.0
+
     @staticmethod
     @njit
     def convergeAlpha(hx, alpha, q_old, q_new, relaxation=1):
@@ -1455,6 +1489,9 @@ class NLPSE():
         """
         delta_Fmn = np.zeros((self.harmonics.shape[0]))
         Fr_local = self.computeNLT(self.helper_mats, station, mode[0], mode[1])
+
+        # print_rz(f"Fr local = {Fr_local}")
+        # print_rz(f"F old = {self.Fmn[station, 0, 0, :]}")
         
         if np.linalg.norm(Fr_local) == 0.0:
             delta_Fmn_local = 0.0
@@ -1535,7 +1572,32 @@ class NLPSE():
                 
                 # Handle mean flow distortion
                 if mode[0] == 0 and mode[1] == 0:
-                    q_local = self._handle_mean_flow_distortion(station)
+                    # solve the boundary layer equations
+                    # q_local = self._handle_mean_flow_distortion(station)
+
+
+                    # solve the PSE equations for the (0,0) mode
+                    # if doing so, use the externally generated mean flow 
+                    print_rz(f"x for blasius = {self.xgrid[station]}")
+                    self.Baseflow.Blasius(self.ygrid, x=self.xgrid[station], Uinf = self.config['flow']['Uinf'], nu = self.config['flow']['nu'])
+
+                    self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer)
+                    # if not linear, add the NLT forcing to the RHS
+                    if not self.config['simulation']['linear']:
+                        self.b += self.Fmn[station, mode[0], mode[1], :]
+
+                    self.setBCsMFD(mode[0], mode[1])
+                    q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
+                    print_rz(f"MFD_u = {q_local[0:self.Ny]}")
+                    print_rz(f"MFD_v = {q_local[self.Ny:2*self.Ny]}")
+                    print_rz(f"MFD_w = {q_local[2*self.Ny:3*self.Ny]}")
+                    print_rz(f"MFD_p = {q_local[3*self.Ny:4*self.Ny]}")
+
+                    if iteration == 1 and station == 1:
+                        plt.figure(figsize=(6,3),dpi=200)
+                        plt.plot(q_local[0:self.Ny], self.ygrid)
+                        plt.tight_layout()
+                        plt.savefig('mfd_u.png')
                     
                 self.comm.Barrier()
                 self._broadcast_flow_variables(station)

@@ -22,8 +22,8 @@ class derivativeOperators:
             self.Dyy = self.map_D_cheby(self.ygrid, 2, True)
 
         elif self.method == "fd" or self.method == "geometric" or self.method=="uniform":
-            self.Dy = self.set_D_FD(self.ygrid,d=1,order=2, output_full=True, uniform=False)
-            self.Dyy = self.set_D_FD(self.ygrid,d=2,order=2, output_full=True, uniform=False)
+            self.Dy = self.set_D_FD(self.ygrid,d=1,order=4, output_full=True, uniform=False)
+            self.Dyy = self.set_D_FD(self.ygrid,d=2,order=4, output_full=True, uniform=False)
 
             pressure_ygrid = 0.5 * (self.ygrid[:-1] + self.ygrid[1:])
             self.Dyp = self.set_D_FD(pressure_ygrid, d=1,order=2,output_full=True,uniform=False)

@@ -1327,7 +1327,7 @@ class NLPSE():
             self.L[(0*ny-0,1*ny-0,2*ny-0),(0*ny-0,1*ny-0,2*ny-0)] = 500*1.0j
             self.L[(1*ny-1,2*ny-1,3*ny-1),(1*ny-1,2*ny-1,3*ny-1)] = 500*1.0j
 
-    def setBCsMFD(self, m, n, setup_eigs=False):
+    def setBCsMFD(self, setup_eigs=False):
         """
         Sets mixed boundary conditions:
         - Dirichlet at wall for u,v,w,p
@@ -1453,10 +1453,49 @@ class NLPSE():
             else:
                 print_rz("Invalid option for baseflow in input file!")
         else:
-            self.updateMeanFlow(self.helper_mats, station)
-        
-        q_local = np.copy(self.q[station, 0, 0, :]) 
-        
+
+            #TODO: Do i need to update the presure field in this case?
+            # print_rz(f"x for blasius = {self.xgrid[station]}")
+            self.Baseflow.Blasius(self.ygrid, x=self.xgrid[station], Uinf = self.config['flow']['Uinf'], nu = self.config['flow']['nu'])
+            self.U[:,station] = self.Baseflow.U[0,:]
+            self.Uy[:,station] = self.Baseflow.Uy[0,:]
+            self.Ux[:,station] = self.Baseflow.Ux[0,:]
+            self.V[:,station] = self.Baseflow.V[0,:]
+            self.Vy[:,station] = self.Baseflow.Vy[0,:]
+            self.Vx[:,station] = self.Baseflow.Vx[0,:]
+
+        if not self.config['simulation']['linear']:
+
+            self.formOperators(self.helper_mats, station, 0, 0, self.stabilizer)
+            self.b += self.Fmn[station, 0, 0, :]
+            self.setBCsMFD()
+
+            q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
+
+            umfd = self.helper_mats['u_from_SPE'] @ q_local
+            vmfd = self.helper_mats['v_from_SPE'] @ q_local
+
+            umfd_dy = self.Dy @ umfd
+            vmfd_dy = self.Dy @ vmfd
+
+            qm1 = np.real(self.q[station -1, 0, 0, :])
+            umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
+            vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
+
+            umfd_dx = (umfd - umfd_m1) / self.hx[station]
+            vmfd_dx = (vmfd - vmfd_m1) / self.hx[station]
+
+            self.U[:,station] += umfd
+            self.V[:,station] += vmfd
+
+            self.Uy[:,station] += umfd_dy
+            self.Vy[:,station] += vmfd_dy
+
+            self.Ux[:,station] += umfd_dx
+            self.Vx[:,station] += vmfd_dx
+        else:
+            q_local = np.zeros_like(self.q[0,0,0,:])
+
         if self.config['simulation']['linear']:
             print_rz("Finished computing mean flow")
         else:
@@ -1583,49 +1622,39 @@ class NLPSE():
                 # Handle mean flow distortion
                 if mode[0] == 0 and mode[1] == 0:
                     # solve the boundary layer equations
-                    # q_local = self._handle_mean_flow_distortion(station)
+                    q_local = self._handle_mean_flow_distortion(station)
 
 
                     # solve the PSE equations for the (0,0) mode
                     # if doing so, use the externally generated mean flow 
-                    print_rz(f"x for blasius = {self.xgrid[station]}")
-                    self.Baseflow.Blasius(self.ygrid, x=self.xgrid[station], Uinf = self.config['flow']['Uinf'], nu = self.config['flow']['nu'])
-                    self.U[:,station] = self.Baseflow.U[0,:]
-                    self.Uy[:,station] = self.Baseflow.Uy[0,:]
-                    self.Ux[:,station] = self.Baseflow.Ux[0,:]
-                    self.V[:,station] = self.Baseflow.V[0,:]
-                    self.Vy[:,station] = self.Baseflow.Vy[0,:]
-                    self.Vx[:,station] = self.Baseflow.Vx[0,:]
-
-                    self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer)
-                    # if not linear, add the NLT forcing to the RHS
-                    if not self.config['simulation']['linear']:
-                        self.b += self.Fmn[station, mode[0], mode[1], :]
-
-                    self.setBCsMFD(mode[0], mode[1])
-                    q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
-                    umfd = self.helper_mats['u_from_SPE'] @ q_local
-                    vmfd = self.helper_mats['v_from_SPE'] @ q_local
-
-                    umfd_dy = self.Dy @ umfd
-                    vmfd_dy = self.Dy @ vmfd
-
-                    qm1 = np.real(self.q[station -1, 0, 0, :])
-                    umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
-                    vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
-                    
-                    umfd_dx = (umfd - umfd_m1) / self.hx[station]
-                    vmfd_dx = (vmfd - vmfd_m1) / self.hx[station]
-
-                    self.U[:,station] += umfd
-                    self.V[:,station] += vmfd
-
-                    self.Uy[:,station] += umfd_dy
-                    self.Vy[:,station] += vmfd_dy
-
-                    self.Ux[:,station] += umfd_dx
-                    self.Vx[:,station] += vmfd_dx
-
+                    # self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer)
+                    # # if not linear, add the NLT forcing to the RHS
+                    # if not self.config['simulation']['linear']:
+                    #     self.b += self.Fmn[station, mode[0], mode[1], :]
+                    #
+                    # self.setBCsMFD(mode[0], mode[1])
+                    # q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
+                    # umfd = self.helper_mats['u_from_SPE'] @ q_local
+                    # vmfd = self.helper_mats['v_from_SPE'] @ q_local
+                    #
+                    # umfd_dy = self.Dy @ umfd
+                    # vmfd_dy = self.Dy @ vmfd
+                    #
+                    # qm1 = np.real(self.q[station -1, 0, 0, :])
+                    # umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
+                    # vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
+                    # 
+                    # umfd_dx = (umfd - umfd_m1) / self.hx[station]
+                    # vmfd_dx = (vmfd - vmfd_m1) / self.hx[station]
+                    #
+                    # self.U[:,station] += umfd
+                    # self.V[:,station] += vmfd
+                    #
+                    # self.Uy[:,station] += umfd_dy
+                    # self.Vy[:,station] += vmfd_dy
+                    #
+                    # self.Ux[:,station] += umfd_dx
+                    # self.Vx[:,station] += vmfd_dx
                     
                 self.comm.Barrier()
                 self._broadcast_flow_variables(station)

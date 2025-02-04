@@ -554,8 +554,6 @@ class NLPSE():
 
         # zero out contribution from (0,0) mode in the NLT
         # MFD is modifying the baseflow in the PSE operator
-        # 2/1/24 commented out w lines because there is no W baseflow, therefore 
-        # w(0,0) contributionshould be included 
 
         uhat_mn[self.numM-1, self.numN-1, :] = 0
         vhat_mn[self.numM-1, self.numN-1, :] = 0
@@ -1349,23 +1347,17 @@ class NLPSE():
         self.A_solve[1*ny-1,1*ny-1] = 1.0  # u
         self.A_solve[3*ny-1,3*ny-1] = 1.0  # w
         
-        
         # Set corresponding boundary values for u,w
         self.b[[1*ny-1,3*ny-1]] = 0.0
 
-        # clear existing condition for v
-        # self.A_solve[2*ny-1,:] = 0
-
+        # lines are commented out because continuity equation is 
+        # already enforcing dv/dy=0 in the free stream 
+        
         # Set Neumann for v at freestream: dv/dy = 0
         # self.A_solve[2*ny-1,ny:2*ny] = self.Dy[ny-1,:]  # Use last row of Dy matrix
 
         # set for v
         # self.b[[2*ny-1]] = 0.0
-
-        # let's try a pressure bc 
-        # self.A_solve[(3*ny-0),:] = 0.
-        # self.A_solve[3*ny-0, 3*ny-0] = 1.0
-        # self.b[[3*ny-0]] = 0.0
 
     @staticmethod
     @njit
@@ -1493,6 +1485,7 @@ class NLPSE():
 
             self.Ux[:,station] += umfd_dx
             self.Vx[:,station] += vmfd_dx
+
         else:
             q_local = np.zeros_like(self.q[0,0,0,:])
 
@@ -1624,38 +1617,6 @@ class NLPSE():
                     # solve the boundary layer equations
                     q_local = self._handle_mean_flow_distortion(station)
 
-
-                    # solve the PSE equations for the (0,0) mode
-                    # if doing so, use the externally generated mean flow 
-                    # self.formOperators(self.helper_mats, station, mode[0], mode[1], self.stabilizer)
-                    # # if not linear, add the NLT forcing to the RHS
-                    # if not self.config['simulation']['linear']:
-                    #     self.b += self.Fmn[station, mode[0], mode[1], :]
-                    #
-                    # self.setBCsMFD(mode[0], mode[1])
-                    # q_local = np.real(sp.linalg.solve(self.A_solve, self.b))
-                    # umfd = self.helper_mats['u_from_SPE'] @ q_local
-                    # vmfd = self.helper_mats['v_from_SPE'] @ q_local
-                    #
-                    # umfd_dy = self.Dy @ umfd
-                    # vmfd_dy = self.Dy @ vmfd
-                    #
-                    # qm1 = np.real(self.q[station -1, 0, 0, :])
-                    # umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
-                    # vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
-                    # 
-                    # umfd_dx = (umfd - umfd_m1) / self.hx[station]
-                    # vmfd_dx = (vmfd - vmfd_m1) / self.hx[station]
-                    #
-                    # self.U[:,station] += umfd
-                    # self.V[:,station] += vmfd
-                    #
-                    # self.Uy[:,station] += umfd_dy
-                    # self.Vy[:,station] += vmfd_dy
-                    #
-                    # self.Ux[:,station] += umfd_dx
-                    # self.Vx[:,station] += vmfd_dx
-                    
                 self.comm.Barrier()
                 self._broadcast_flow_variables(station)
                 
@@ -1977,7 +1938,8 @@ class NLPSE():
                     s = (1 / alpha_min  - self.hx[station]) * 0.5 * 2
 
                 elif 'hx' in self.config['grid'].keys():
-                    s = 0.5 * self.config['grid']['hx']
+                    # s = 0.5 * self.config['grid']['hx']
+                    s = 2.0 * self.config['grid']['hx']
 
                 print_rz(f"Stabilizing parameter s = {s}")
                 self.stabilizer = s

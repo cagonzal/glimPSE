@@ -1359,6 +1359,10 @@ class NLPSE():
         # set for v
         # self.b[[2*ny-1]] = 0.0
 
+        # set Neumann for v in freestream using continuity equation 
+        # self.A_solve[4*ny-1, ny:2*ny] = self.Dy[ny-1,:]
+        # self.b[[4*ny-1]] = 0.0
+
     @staticmethod
     @njit
     def convergeAlpha(hx, alpha, q_old, q_new, relaxation=1):
@@ -1446,8 +1450,6 @@ class NLPSE():
                 print_rz("Invalid option for baseflow in input file!")
         else:
 
-            #TODO: Do i need to update the presure field in this case?
-            # print_rz(f"x for blasius = {self.xgrid[station]}")
             self.Baseflow.Blasius(self.ygrid, x=self.xgrid[station], Uinf = self.config['flow']['Uinf'], nu = self.config['flow']['nu'])
             self.U[:,station] = self.Baseflow.U[0,:]
             self.Uy[:,station] = self.Baseflow.Uy[0,:]
@@ -1470,7 +1472,7 @@ class NLPSE():
             umfd_dy = self.Dy @ umfd
             vmfd_dy = self.Dy @ vmfd
 
-            qm1 = np.real(self.q[station -1, 0, 0, :])
+            qm1 = np.real(self.q[station - 1, 0, 0, :])
             umfd_m1 = self.helper_mats['u_from_SPE'] @ qm1
             vmfd_m1 = self.helper_mats['v_from_SPE'] @ qm1
 

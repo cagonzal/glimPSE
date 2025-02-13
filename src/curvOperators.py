@@ -743,7 +743,7 @@ class NLPSE():
         L1 = np.copy(Dy)
         R1 = 0.5 * (fkp1[ny:2*ny] + fk[ny:2*ny]) 
 
-        np.save("DY_OP.npy", L1)
+        # np.save("DY_OP.npy", L1)
 
         #BUG: solution for p at station 1 must be incorrect 
         # comparing the unperturbed base flow and the solution from 

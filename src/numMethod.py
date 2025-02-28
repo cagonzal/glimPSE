@@ -673,20 +673,6 @@ class surfaceImport:
         dtheta_dxi = np.gradient(theta_interp(xi), xi, edge_order=2)
         K1 = -1.0 * dtheta_dxi
 
-        plt.figure(figsize=(6,3),dpi=200)
-        plt.plot(xi, self.theta, '-o', markeredgecolor='k', color=colors[0])
-        plt.xlabel(r'$\xi$')
-        plt.ylabel(r'$\theta$', rotation=0, labelpad=15)
-        plt.tight_layout()
-        plt.savefig('theta.png')
-
-        plt.figure(figsize=(6,3),dpi=200)
-        plt.plot(xi, dtheta_dxi, '-o', markeredgecolor='k', color=colors[0])
-        plt.xlabel(r'$\xi$')
-        plt.ylabel(r'$\frac{d \theta}{d \xi}$', rotation=0, labelpad=15)
-        plt.tight_layout()
-        plt.savefig('theta_gradient.png')
-
         for i, xi_val in enumerate(xi):
             x_s = x_surface_interp(xi_val)
             y_s = y_surface_interp(xi_val)

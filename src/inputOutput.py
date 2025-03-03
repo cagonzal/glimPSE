@@ -221,6 +221,12 @@ def read_velocity_field(filename):
 
             x_field = f['grid/X'][:]
             y_field = f['grid/Y'][:]
+
+            # this negative check is a janky way of getting bottom airfoil PSE running
+            has_negative = (y_field < 0).any()
+            if has_negative:
+                y_field *= -1.0
+
             u_field = f['velocity/U'][:]
             v_field = f['velocity/V'][:]
             p_field = f['pressure/p'][:]

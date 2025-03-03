@@ -25,14 +25,6 @@ class derivativeOperators:
             self.Dy = self.set_D_FD(self.ygrid,d=1,order=2, output_full=True, uniform=False)
             self.Dyy = self.set_D_FD(self.ygrid,d=2,order=2, output_full=True, uniform=False)
 
-            pressure_ygrid = 0.5 * (self.ygrid[:-1] + self.ygrid[1:])
-            self.Dyp = self.set_D_FD(pressure_ygrid, d=1,order=2,output_full=True,uniform=False)
-
-            # self.Dyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=True,order=2,d=1,reduce_wall_order=True,output_full=True,periodic=False,uniform=False)
-            # self.Dyyp = self.set_D_P(self.ygrid,yP=pressure_ygrid,staggered=True,return_P_location=False,full_staggered=False,order=2,d=2,reduce_wall_order=True,output_full=False,periodic=False,uniform=False)
-
-            print_rz(f"Dy shape = {self.Dy.shape}")
-
         else:
             raise ValueError("Invalid method chosen for derivatives")
 
@@ -73,7 +65,7 @@ class derivativeOperators:
             x = np.linalg.solve(np.matrix(A),b)
             return x
 
-    def set_D_FD(self, y,yP=None,order=2,T=2.*np.pi,d=2,reduce_wall_order=False,output_full=False,periodic=False,uniform=False):
+    def set_D_FD(self, y,yP=None,order=2,T=2.*np.pi,d=2,reduce_wall_order=True,output_full=False,periodic=False,uniform=False):
         '''
         Input:
             y: array of y values of channel
@@ -195,7 +187,7 @@ class derivativeOperators:
         if staggered:
             n = 2*y.size-1
             if full_staggered:
-                n = 2*y.size # why 2y.size instead of 2y.size-1
+                n = 2*y.size
         else:
             n=y.size
         ones=np.ones(n)
@@ -627,7 +619,7 @@ class surfaceImport:
         xi_distribution = 'uniform'
         # Generate ξ distribution
         if xi_distribution == 'uniform':
-            xi = np.linspace(0, x1[-2], self.Nx)
+            xi = np.linspace(0, x1[-1], self.Nx)
         elif xi_distribution == 'cosine':
             xi = x1[-1] * 0.5 * (1 - np.cos(np.linspace(0, np.pi, self.Nx)))
         else:
@@ -672,6 +664,20 @@ class surfaceImport:
         self.theta = theta_interp(xi)
         dtheta_dxi = np.gradient(theta_interp(xi), xi, edge_order=2)
         K1 = -1.0 * dtheta_dxi
+
+        plt.figure(figsize=(6,3),dpi=200)
+        plt.plot(xi, self.theta, '-o', markeredgecolor='k', color=colors[0])
+        plt.xlabel(r'$\xi$')
+        plt.ylabel(r'$\theta$', rotation=0, labelpad=15)
+        plt.tight_layout()
+        plt.savefig('theta.png')
+
+        plt.figure(figsize=(6,3),dpi=200)
+        plt.plot(xi, dtheta_dxi, '-o', markeredgecolor='k', color=colors[0])
+        plt.xlabel(r'$\xi$')
+        plt.ylabel(r'$\frac{d \theta}{d \xi}$', rotation=0, labelpad=15)
+        plt.tight_layout()
+        plt.savefig('theta_gradient.png')
 
         for i, xi_val in enumerate(xi):
             x_s = x_surface_interp(xi_val)
@@ -772,15 +778,6 @@ class surfaceImport:
         """
         print_rz(f"U Cartesian Shape: {self.u_field.shape}")
         print_rz(f"U Curvilinear Shape: {self.physicalX.shape}")
-
-        print(f"Does u_field contain nan: {np.isnan(self.u_field).any()}")
-        print(f"Does physicalX contain nan: {np.isnan(self.physicalX).any()}")
-
-
-        # field variables are the ones input directly from the data file 
-        # these correspond to the literal x and y coordinates used in the RANS solver
-        # physicalX corresponds to the curvilinnear coordinates
-
         if self.u_field.shape != self.physicalX.shape:
             # print_rz(f"These shapes do not match. Interpolation required.")
             points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
@@ -807,21 +804,6 @@ class surfaceImport:
         U_xi = self.xi_x * utemp + self.xi_y * vtemp
         U_eta = self.eta_x * utemp + self.eta_y * vtemp
 
-        print(f"Checking for nan values")
-        print(f"Does xi_x contain nan: {np.isnan(self.xi_x).any()}")
-        print(f"Does xi_y contain nan: {np.isnan(self.xi_y).any()}")
-        print(f"Does eta_x contain nan: {np.isnan(self.eta_x).any()}")
-        print(f"Does eta_y contain nan: {np.isnan(self.eta_y).any()}")
-        print(f"Does utemp contain nan: {np.isnan(utemp).any()}")
-        print(f"Does vtemp contain nan: {np.isnan(vtemp).any()}")
-
-        # check the range of coordinates
-        print(f"points x range: {np.min(points[:,0])}, {np.max(points[:,0])}")
-        print(f"points y range: {np.min(points[:,1])}, {np.max(points[:,1])}")
-
-        print(f"physicalX x range: {np.min(self.physicalX)}, {np.max(self.physicalX)}")
-        print(f"physicalY y range: {np.min(self.physicalY)}, {np.max(self.physicalY)}")
-
         self.u_grid = U_xi
         self.v_grid = U_eta
         self.p_grid = ptemp
@@ -831,7 +813,6 @@ class surfaceImport:
         # first compute l0 
         # use physical nu 
         nu = 3.75e-06
-        rhoinf = 1.225
 
         Uinf = np.max(self.u_grid[0,:])
         # Uinf = 15.0 # global Uinf
@@ -856,7 +837,6 @@ class surfaceImport:
 
         self.u_grid /= Uinf
         self.v_grid /= Uinf
-        self.p_grid = self.p_grid / (0.5 * rhoinf * Uinf**2)
 
         self.xi_grid /= l0 
         self.eta_grid /= l0
@@ -1179,3 +1159,4 @@ class gortlerGrid:
         self.dJ22_deta = np.gradient(self.J22, self.eta, axis=1)
         # Compute higher order metric terms
     
+

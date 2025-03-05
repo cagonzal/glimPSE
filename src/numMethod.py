@@ -619,7 +619,7 @@ class surfaceImport:
         xi_distribution = 'uniform'
         # Generate ξ distribution
         if xi_distribution == 'uniform':
-            xi = np.linspace(0, x1[-1], self.Nx)
+            xi = np.linspace(0, x1[-2], self.Nx)
         elif xi_distribution == 'cosine':
             xi = x1[-1] * 0.5 * (1 - np.cos(np.linspace(0, np.pi, self.Nx)))
         else:
@@ -665,20 +665,6 @@ class surfaceImport:
         dtheta_dxi = np.gradient(theta_interp(xi), xi, edge_order=2)
         K1 = -1.0 * dtheta_dxi
 
-        plt.figure(figsize=(6,3),dpi=200)
-        plt.plot(xi, self.theta, '-o', markeredgecolor='k', color=colors[0])
-        plt.xlabel(r'$\xi$')
-        plt.ylabel(r'$\theta$', rotation=0, labelpad=15)
-        plt.tight_layout()
-        plt.savefig('theta.png')
-
-        plt.figure(figsize=(6,3),dpi=200)
-        plt.plot(xi, dtheta_dxi, '-o', markeredgecolor='k', color=colors[0])
-        plt.xlabel(r'$\xi$')
-        plt.ylabel(r'$\frac{d \theta}{d \xi}$', rotation=0, labelpad=15)
-        plt.tight_layout()
-        plt.savefig('theta_gradient.png')
-
         for i, xi_val in enumerate(xi):
             x_s = x_surface_interp(xi_val)
             y_s = y_surface_interp(xi_val)
@@ -689,7 +675,9 @@ class surfaceImport:
             
             # Generate grid points
             X_curv[i, :] = x_s - eta * np.sin(theta_s)
-            Y_curv[i, :] = y_s + eta * np.cos(theta_s)
+            # Y_curv[i, :] = y_s + eta * np.cos(theta_s)
+            # airfoil flip sign for pressure side
+            Y_curv[i, :] = y_s - eta * np.cos(theta_s)
 
         self.physicalX = X_curv
         self.physicalY = Y_curv
@@ -778,6 +766,13 @@ class surfaceImport:
         """
         print_rz(f"U Cartesian Shape: {self.u_field.shape}")
         print_rz(f"U Curvilinear Shape: {self.physicalX.shape}")
+
+        print_rz(f"U Cartesian Shape: {self.u_field.shape}")
+        print_rz(f"U Curvilinear Shape: {self.physicalX.shape}")
+
+        print(f"Does u_field contain nan: {np.isnan(self.u_field).any()}")
+        print(f"Does physicalX contain nan: {np.isnan(self.physicalX).any()}")
+        
         if self.u_field.shape != self.physicalX.shape:
             # print_rz(f"These shapes do not match. Interpolation required.")
             points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
@@ -786,23 +781,53 @@ class surfaceImport:
             ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
         else:
             print_rz("Interpolating")
-            from scipy.interpolate import Rbf
+            from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
             points = np.column_stack((self.x_field.flatten(), self.y_field.flatten()))
-            # rbf_interp_u = Rbf(points[:,0], points[:,1], self.u_field.flatten(), function='thin_plate', smooth=0.1)
-            # rbf_interp_v = Rbf(points[:,0], points[:,1], self.v_field.flatten(), function='thin_plate', smooth=0.1)
-            # rbf_interp_p = Rbf(points[:,0], points[:,1], self.p_field.flatten(), function='thin_plate', smooth=0.1)
-            # utemp = rbf_interp_u(self.physicalX, self.physicalY)
-            # vtemp = rbf_interp_v(self.physicalX, self.physicalY)
-            # ptemp = rbf_interp_p(self.physicalX, self.physicalY)
-            #
-            utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
-            ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+
+            # utemp = griddata(points, self.u_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+            # vtemp = griddata(points, self.v_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+            # ptemp = griddata(points, self.p_field.flatten(), (self.physicalX, self.physicalY), method='linear')
+
+            # Create interpolators for u, v, and p fields
+            u_interp = LinearNDInterpolator(points, self.u_field.flatten())
+            v_interp = LinearNDInterpolator(points, self.v_field.flatten())
+            p_interp = LinearNDInterpolator(points, self.p_field.flatten())
+
+            # Interpolate values at physical grid points
+            utemp = u_interp(self.physicalX, self.physicalY)
+            vtemp = v_interp(self.physicalX, self.physicalY)
+            ptemp = p_interp(self.physicalX, self.physicalY)
+
+            # Handle NaN values with nearest neighbor interpolation as fallback
+            for field, field_values, field_name in [
+                (utemp, self.u_field.flatten(), 'u'),
+                (vtemp, self.v_field.flatten(), 'v'),
+                (ptemp, self.p_field.flatten(), 'p')
+            ]:
+                mask = np.isnan(field)
+                if np.any(mask):
+                    nearest = NearestNDInterpolator(points, field_values)
+                    field[mask] = nearest(self.physicalX[mask], self.physicalY[mask])
 
         self.compute_metrics()
 
         U_xi = self.xi_x * utemp + self.xi_y * vtemp
         U_eta = self.eta_x * utemp + self.eta_y * vtemp
+
+        print(f"Checking for nan values")
+        print(f"Does xi_x contain nan: {np.isnan(self.xi_x).any()}")
+        print(f"Does xi_y contain nan: {np.isnan(self.xi_y).any()}")
+        print(f"Does eta_x contain nan: {np.isnan(self.eta_x).any()}")
+        print(f"Does eta_y contain nan: {np.isnan(self.eta_y).any()}")
+        print(f"Does utemp contain nan: {np.isnan(utemp).any()}")
+        print(f"Does vtemp contain nan: {np.isnan(vtemp).any()}")
+
+        # check the range of coordinates
+        print(f"points x range: {np.min(points[:,0])}, {np.max(points[:,0])}")
+        print(f"points y range: {np.min(points[:,1])}, {np.max(points[:,1])}")
+
+        print(f"physicalX x range: {np.min(self.physicalX)}, {np.max(self.physicalX)}")
+        print(f"physicalY y range: {np.min(self.physicalY)}, {np.max(self.physicalY)}")
 
         self.u_grid = U_xi
         self.v_grid = U_eta

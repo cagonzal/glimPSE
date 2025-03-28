@@ -314,4 +314,228 @@ class Baseflow:
         self.Wy = np.zeros_like(self.W)
         self.Wxy = np.zeros_like(self.W)
 
+    def FalknerSkan(self, y, x=1, Uinf=1, nu=1, beta=0):
+        '''
+        Input:
+            y: array of height of channel or flat plate
+            x: location along plate
+            Uinf: free stream velocity
+            nu: kinematic viscosity
+            beta: pressure gradient parameter (Falkner-Skan wedge angle parameter)
+                 beta = 0 corresponds to Blasius flat plate
+                 beta > 0 corresponds to accelerating flow (favorable pressure gradient)
+                 beta < 0 corresponds to decelerating flow (adverse pressure gradient)
 
+        Output base flow for Falkner-Skan boundary layer
+            U: U mean velocity
+            Uy: dU/dy of mean velocity
+            Uyy: d^2U/dy^2 of mean velocity
+            Ux: dU/dx of mean velocity
+            V: wall normal mean velocity
+            Vy: dV/dy
+            Vx: dV/dx
+        '''
+        from scipy.integrate import solve_ivp
+
+        # Create a fine uniform grid for integration
+        y_uniform = np.linspace(y.min(), y.max(), y.size*100)
+
+        # Define similarity variable eta
+        m = beta / (2 - beta)  # Power-law exponent for external velocity U_e ~ x^m
+
+        # Define eta max for integration (ensure it's large enough for asymptotic behavior)
+        eta_max = 20.0  # Usually sufficient for boundary layer to reach asymptotic behavior
+
+        # Calculate similarity variable eta for original y grid
+        eta = y_uniform * np.sqrt(Uinf * (1 + m) / (2 * nu * x))
+
+        # Create a uniform eta grid for the shooting method
+        eta_uniform = np.linspace(0, eta_max, 1000)
+
+        # Define the ODE system for Falkner-Skan
+        # Converting to first-order system:
+        # Let z = [f', f'', f]
+        # z[0] = f'
+        # z[1] = f''
+        # z[2] = f
+        # Then:
+        # z'[0] = f'' = z[1]
+        # z'[1] = f''' = -z[2]*z[1] - beta*(1-z[0]^2)
+        # z'[2] = f' = z[0]
+        def falkner_skan_ode(t, z):
+            return [z[1], -z[2]*z[1] - beta*(1 - z[0]**2), z[0]]
+
+        # Shooting method to find the correct f''(0) value
+        def shoot(fpp0_guess):
+            # Initial conditions [f'(0), f''(0), f(0)]
+            z0 = [0.0, fpp0_guess, 0.0]
+
+            # Solve ODE with this guess
+            sol = solve_ivp(
+                falkner_skan_ode, 
+                [0, eta_max], 
+                z0, 
+                method='RK45',
+                t_eval=eta_uniform, 
+                rtol=1e-6, 
+                atol=1e-6
+            )
+
+            # Get f'(eta_max) - should approach 1.0 for correct solution
+            fp_end = sol.y[0, -1]
+
+            # Return the error
+            return fp_end - 1.0
+
+        # Initial guess for f''(0) based on beta
+        if beta == 0:
+            fpp0_guess = 0.332057336215195 * np.sqrt(2.)  # Blasius solution
+        elif beta > 0:
+            if beta <= 1:
+                fpp0_guess = 0.332057336215195 * np.sqrt(2.) * (1 + 0.5*beta)
+            else:
+                fpp0_guess = 1.2 * np.sqrt(1 + beta)
+        else:
+            # For negative beta, more careful with initial guess
+            if beta >= -0.1988:  # Theoretical limit for attached flow
+                fpp0_guess = 0.332057336215195 * np.sqrt(2.) * (1 + beta)
+            else:
+                raise ValueError(f"Beta = {beta} is below -0.1988, which may not have an attached flow solution")
+
+        # Use binary search for the shooting method
+        # (more robust than Newton's method for this problem)
+        tol = 1e-6
+        max_iter = 50
+
+        # Initial bounds for binary search
+        if beta >= 0:
+            low = 0.1
+            high = 10.0
+        else:
+            # For negative beta, we need different bounds
+            low = 0.01
+            high = 0.332057336215195 * np.sqrt(2.)  # Blasius value as upper bound
+
+        # Binary search iteration
+        iter_count = 0
+        err_low = shoot(low)
+        err_high = shoot(high)
+
+        # Check if our bounds are suitable
+        if err_low * err_high >= 0:
+            # If signs are the same, adjust bounds
+            if abs(err_low) < abs(err_high):
+                high = low
+                low = low / 10
+            else:
+                low = high
+                high = high * 10
+            err_low = shoot(low)
+            err_high = shoot(high)
+
+            # If still not bracketing the root, use the initial guess
+            if err_low * err_high >= 0:
+                fpp0 = fpp0_guess
+            else:
+                # Continue with binary search
+                fpp0 = (low + high) / 2
+        else:
+            fpp0 = (low + high) / 2
+
+        # Main binary search loop
+        while abs(high - low) > tol and iter_count < max_iter:
+            fpp0 = (low + high) / 2
+            err = shoot(fpp0)
+
+            if abs(err) < tol:
+                break
+
+            if err * err_low < 0:
+                high = fpp0
+            else:
+                low = fpp0
+                err_low = err
+
+            iter_count += 1
+
+        # Final f''(0) value from shooting method
+        fpp0 = (low + high) / 2
+
+        # Solve the ODE with the correct initial condition
+        z0 = [0.0, fpp0, 0.0]
+        sol = solve_ivp(
+            falkner_skan_ode, 
+            [0, eta_max], 
+            z0, 
+            method='RK45',
+            t_eval=eta_uniform, 
+            rtol=1e-6, 
+            atol=1e-6
+        )
+
+        # Extract solution
+        fp = sol.y[0, :]  # f'
+        fpp = sol.y[1, :]  # f''
+        f = sol.y[2, :]  # f
+        eta_sol = sol.t  # eta values
+
+        # Interpolate to original y grid
+        fp_interp = np.interp(eta, eta_sol, fp)
+        fpp_interp = np.interp(eta, eta_sol, fpp)
+        f_interp = np.interp(eta, eta_sol, f)
+
+        # Calculate f'''
+        # Use the ODE to get f''' directly instead of numerical differentiation
+        fppp = np.zeros_like(fpp_interp)
+        for i in range(len(fppp)):
+            fppp[i] = -f_interp[i] * fpp_interp[i] - beta * (1 - fp_interp[i]**2)
+
+        # Calculate velocity components and derivatives based on the solution
+        # External velocity (power law)
+        Ue = Uinf  # At the specified x-location
+
+        # Scale factor for derivatives
+        scale_factor = np.sqrt(Ue * (1 + m) / (2 * nu * x))
+
+        # Interpolate solution back to original y grid
+        fp = fp_interp
+        fpp = fpp_interp
+        f = f_interp
+        fppp = fppp    # f''' already calculated from the ODE
+
+        # External velocity (power law)
+        Ue = Uinf  # At the specified x-location
+
+        # Calculate velocity components and derivatives
+        U = Ue * fp  # u = Ue * f'
+
+        # Scale factor for derivatives
+        scale_factor = np.sqrt(Ue * (1 + m) / (2 * nu * x))
+
+        # Velocity derivatives
+        Uy = fpp * scale_factor
+        Uyy = fppp * (scale_factor**2)
+        Ux = Ue * m / (2 * x) * (2 * fp - eta * fpp)
+
+        # Wall-normal velocity
+        V = np.sqrt(nu * Ue / (2 * x)) * ((1 - m) * f + m * eta * fp)
+
+        # Wall-normal velocity derivatives
+        Vy = Ue / (2 * x) * ((1 - m) * fp + m * eta * fpp)
+        Vx = np.sqrt(nu * Ue / (8 * x**3)) * (-(1 - m) * f - m * eta * fp + (1 - m) * eta * fp + m * eta**2 * fpp)
+
+        # Assign to self for consistent interface with Blasius method
+        self.U = U[np.newaxis, :]
+        self.Uy = Uy[np.newaxis, :]
+        self.Uyy = Uyy[np.newaxis, :]
+        self.Ux = Ux[np.newaxis, :]
+        self.V = V[np.newaxis, :]
+        self.Vy = Vy[np.newaxis, :]
+        self.Vx = Vx[np.newaxis, :]
+        self.W = np.zeros_like(self.V)
+        self.Wx = np.zeros_like(self.V)
+        self.Wxy = np.zeros_like(self.V)
+        self.Wy = np.zeros_like(self.V)
+        self.P = np.zeros_like(self.V)
+
+        return
